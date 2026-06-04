@@ -1,0 +1,35 @@
+{
+  "goals": [
+    {
+      "id": 101,
+      "name": "Cuenta de Ahorro",
+      "targetAmount": 100000.0,
+      "currentAmount": 99972.0,
+      "currency": "USD",
+      "transactions": [
+        {
+          "id": 1780362340.227244,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-01T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        }
+      ],
+      "createdAt": "2026-06-01T21:04:31.123863"
+    }
+  ],
+  "automations": [
+    {
+      "id": "rule_1",
+      "goalId": 101,
+      "actionType": "remove",
+      "amount": 28.0,
+      "frequency": "daily",
+      "note": "Luz",
+      "lastRun": "2026-06-01T01:00:05",
+      "nextRun": "2026-06-02T01:00:05",
+      "createdAt": "2026-06-01T21:04:31.123894"
+    }
+  ]
+}

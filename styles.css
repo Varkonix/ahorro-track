@@ -1,0 +1,1412 @@
+/* Variables CSS */
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #4ecdc4;
+    --warning-color: #feca57;
+    --danger-color: #ff6b6b;
+    --background-primary: #1a1d29;
+    --background-secondary: #252836;
+    --background-card: #2d3142;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a3bd;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-success: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+    --gradient-warning: linear-gradient(135deg, #feca57 0%, #ff9ff3 100%);
+    --gradient-danger: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    --shadow-light: 0 4px 16px rgba(0, 0, 0, 0.1);
+    --shadow-medium: 0 8px 32px rgba(0, 0, 0, 0.2);
+    --shadow-heavy: 0 16px 64px rgba(0, 0, 0, 0.3);
+}
+
+/* Reset y estilos globales */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--background-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+.app-container {
+    max-width: 428px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--background-primary);
+    position: relative;
+    box-shadow: var(--shadow-heavy);
+}
+
+/* Header */
+.header {
+    background: var(--gradient-primary);
+    padding: 70px 20px 25px 20px;
+    text-align: center;
+    position: relative;
+    box-shadow: var(--shadow-medium);
+}
+
+/* Ajustes para dispositivos móviles con más padding */
+@media screen and (max-width: 768px) {
+    .header {
+        padding: 80px 20px 30px 20px;
+    }
+}
+
+/* Soporte especial para iOS con notch / Dynamic Island */
+@supports (padding: max(0px)) {
+    .header {
+        padding-top: max(85px, env(safe-area-inset-top, 0px) + 50px);
+        padding-left: max(20px, env(safe-area-inset-left, 0px));
+        padding-right: max(20px, env(safe-area-inset-right, 0px));
+        padding-bottom: 30px;
+    }
+}
+
+.header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.settings-btn {
+    position: absolute;
+    top: 75px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+/* Ajustar posición del botón en móviles */
+@media screen and (max-width: 768px) {
+    .settings-btn {
+        top: 85px;
+    }
+}
+
+/* Ajustar posición del botón para iOS con notch */
+@supports (padding: max(0px)) {
+    .settings-btn {
+        top: max(80px, env(safe-area-inset-top, 0px) + 45px);
+        right: max(20px, env(safe-area-inset-right, 0px));
+    }
+}
+
+.settings-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+.settings-btn span {
+    font-size: 18px;
+}
+
+/* Totales */
+.totals-section {
+    padding: 20px;
+    background: var(--background-secondary);
+}
+
+.totals-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    text-align: center;
+    color: var(--text-primary);
+}
+
+.currencies-scroll {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 8px 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.currencies-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.currency-total {
+    min-width: 120px;
+    padding: 16px;
+    background: var(--gradient-primary);
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: var(--shadow-light);
+    flex-shrink: 0;
+}
+
+.currency-flag {
+    font-size: 24px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.currency-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+}
+
+.empty-totals {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-secondary);
+}
+
+/* Sección de metas */
+.goals-section {
+    padding: 20px;
+    flex: 1;
+}
+
+.goals-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.goals-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.add-goal-btn {
+    background: var(--gradient-success);
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-light);
+}
+
+.add-goal-btn:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-medium);
+}
+
+.add-goal-btn span {
+    font-size: 24px;
+    color: white;
+    font-weight: 300;
+}
+
+/* Tarjetas de metas */
+.goals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Estilos para drag and drop con long press */
+.goal-card {
+    background: var(--background-card);
+    border: 2px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-light);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.goal-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-medium);
+    border-color: var(--primary-color);
+}
+
+.goal-card.drag-ready {
+    border-color: var(--warning-color);
+    box-shadow: 0 0 20px rgba(254, 202, 87, 0.3);
+}
+
+.goal-card.dragging {
+    opacity: 0.95;
+    box-shadow: var(--shadow-heavy);
+    transition: none;
+    border-color: var(--primary-color);
+    background-color: var(--background-card);
+    transform: scale(1.02);
+}
+
+.goal-content {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    position: relative;
+    z-index: 2;
+    flex: 1;
+}
+
+/* Handle de arrastre */
+.drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 48px;
+    cursor: grab; /* Cursor de agarre para mouse */
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    border-radius: 8px;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    touch-action: none; /* Importante para el drag */
+}
+
+.drag-handle:hover {
+    opacity: 0.7;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: grab;
+    transform: scale(1.05);
+}
+
+.drag-handle.pressing {
+    background: rgba(74, 144, 226, 0.3);
+    opacity: 1;
+    transform: scale(0.95);
+    animation: pulse 0.5s ease-in-out;
+    cursor: grabbing;
+}
+
+.drag-handle.drag-active {
+    background-color: rgba(0, 123, 255, 0.3);
+    cursor: grabbing;
+    animation: pulse-subtle 1.5s infinite;
+}
+
+/* Mejorar la respuesta visual para mouse */
+.drag-handle:active {
+    transform: scale(1.05);
+}
+
+.drag-handle.drag-active:active {
+    cursor: grabbing;
+}
+
+.drag-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: center;
+}
+
+.drag-lines span {
+    width: 14px;
+    height: 2px;
+    background: var(--text-secondary);
+    border-radius: 1px;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.drag-handle:hover .drag-lines span {
+    background: var(--primary-color);
+}
+
+.drag-handle.pressing .drag-lines span {
+    background: var(--text-primary);
+    transform: scaleX(1.15);
+}
+
+.drag-handle.drag-active .drag-lines span {
+    background: var(--text-primary);
+    transform: scaleX(1.25);
+}
+
+/* Animación de pulso para indicar que está listo para arrastrar */
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes pulse-subtle {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+}
+
+/* Contenedor para evitar que se salga */
+#goals-container {
+    overflow: hidden;
+    position: relative;
+}
+
+.goal-card.drag-ready .drag-handle {
+    animation: pulse 1.5s infinite;
+}
+
+.goal-content {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    position: relative;
+    z-index: 2;
+}
+
+.goal-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.goal-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.goal-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.goal-info h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    word-wrap: break-word;
+}
+
+.goal-amounts {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.saved {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--success-color);
+}
+
+.target {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--gradient-success);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.remaining {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.goal-date {
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-state p {
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+/* Overlay de eliminación - MEJORADO */
+.delete-overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 80px;
+    height: 100%;
+    background: var(--gradient-danger);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    color: white;
+    font-weight: 600;
+    z-index: 3;
+    pointer-events: all;
+    transform: translateX(100%);
+    border-radius: 0 16px 16px 0;
+    cursor: pointer;
+}
+
+.delete-overlay:hover {
+    background: linear-gradient(135deg, #ff4757, #ff3838);
+    transform: translateX(0) scale(1.05);
+}
+
+.delete-overlay span {
+    font-size: 14px;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* Botón de eliminar visible */
+.goal-card {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Remover estos estilos relacionados con eliminación desde tarjetas */
+/*
+.goal-card .delete-btn {
+    // Remover todo este bloque
+}
+
+.delete-overlay {
+    // Remover todo este bloque
+}
+
+.goal-card.show-delete .delete-overlay {
+    // Remover todo este bloque
+}
+
+.goal-card.show-delete .goal-content {
+    // Remover todo este bloque
+}
+*/
+
+.goal-card .delete-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 71, 87, 0.9);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.goal-card .delete-btn:hover {
+    background: rgba(255, 71, 87, 1);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
+}
+
+.goal-card .delete-btn:active {
+    transform: scale(0.95);
+}
+
+/* Animación al tocar la tarjeta */
+.goal-card.show-delete .delete-overlay {
+    transform: translateX(0);
+}
+
+.goal-card.show-delete .goal-content {
+    transform: translateX(-80px);
+}
+
+.goal-content {
+    transition: transform 0.3s ease;
+}
+
+/* Modales */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background: var(--background-card);
+    margin: 5% auto;
+    padding: 24px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: var(--shadow-heavy);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color 0.3s ease;
+    padding: 4px;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Formularios */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--primary-color);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    font-size: 16px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+/* Selector de moneda más visible */
+.form-group select {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+    border: 2px solid var(--primary-color);
+    color: white;
+    font-weight: 600;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 16 16'%3e%3cpath d='m7.247 4.86-4.796 5.481c-.566.647-.106 1.659.753 1.659h9.592a1 1 0 0 0 .753-1.659l-4.796-5.48a1 1 0 0 0-1.506 0z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+.form-group select option {
+    background: var(--background-card);
+    color: var(--text-primary);
+    padding: 10px;
+    font-weight: 500;
+}
+
+.form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+    transform: scale(1.02);
+}
+
+.form-group input::placeholder {
+    color: var(--text-secondary);
+}
+
+/* Upload de imagen */
+/* Imagen en detalle de meta - más ancha */
+.goal-detail-image {
+    width: 120px;
+    height: 80px;
+    margin: 0 auto 16px;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.goal-detail-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.goal-detail-image.enlarged {
+    width: 160px;
+    height: 100px;
+    margin: 0 auto 20px;
+}
+
+.goal-detail-image.enlarged img {
+    transform: scale(1.1);
+}
+
+/* Imágenes en modales de crear/editar - más anchas */
+.image-upload {
+    width: 100%;
+    height: 120px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+
+.image-upload:hover {
+    border-color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.image-upload img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.upload-placeholder {
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.upload-icon {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* Botones */
+.btn-primary, .btn-secondary, .btn-danger, .btn-action {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 100px;
+}
+
+.btn-primary {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:hover, .btn-primary:active {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover, .btn-secondary:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-danger {
+    background: var(--gradient-danger);
+    color: white;
+    box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
+}
+
+.btn-danger:hover, .btn-danger:active {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+}
+
+/* Botones de acción en detalle */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin: 24px 0;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.btn-add {
+    background: var(--gradient-success);
+    color: white;
+}
+
+.btn-remove {
+    background: var(--gradient-warning);
+    color: white;
+}
+
+.btn-edit {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+/* Detalle de meta */
+.goal-detail-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.goal-detail-image {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 16px;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.goal-detail-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.goal-detail-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.goal-amounts {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.amount-box {
+    flex: 1;
+    text-align: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.amount-label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.amount-value {
+    display: block;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.progress-container {
+    margin-bottom: 24px;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.progress-percentage {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--success-color);
+}
+
+.remaining-amount {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Transacciones */
+.transactions-section {
+    margin-top: 24px;
+}
+
+.transactions-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+.transactions-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    border-left: 4px solid;
+}
+
+.transaction-item.positive {
+    background: rgba(78, 205, 196, 0.1);
+    border-left-color: var(--success-color);
+}
+
+.transaction-item.negative {
+    background: rgba(254, 202, 87, 0.1);
+    border-left-color: var(--warning-color);
+}
+
+.transaction-info {
+    flex: 1;
+}
+
+.transaction-amount {
+    font-size: 16px;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.transaction-item.positive .transaction-amount {
+    color: var(--success-color);
+}
+
+.transaction-item.negative .transaction-amount {
+    color: var(--warning-color);
+}
+
+.transaction-note {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.transaction-date {
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.transaction-date span {
+    display: block;
+}
+
+.no-transactions {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 32px 16px;
+    font-style: italic;
+}
+
+/* Modal de confirmación */
+.confirm-content {
+    text-align: center;
+}
+
+.confirm-content h3 {
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+.confirm-content p {
+    margin-bottom: 24px;
+    color: var(--text-secondary);
+}
+
+.confirm-goal-name {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.confirm-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.confirm-buttons button {
+    flex: 1;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .modal-content {
+        margin: 10% auto;
+        width: 95%;
+        padding: 20px;
+    }
+    
+    .goal-amounts {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .btn-action {
+        width: 100%;
+    }
+}
+
+/* Accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Mejorar la respuesta táctil */
+@media (hover: none) and (pointer: coarse) {
+    .drag-handle {
+        cursor: default;
+    }
+    
+    .drag-handle:hover {
+        transform: none;
+        background-color: transparent;
+    }
+}
+
+/* Focus visible para navegación por teclado */
+button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
+}
+
+.export-import-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.export-import-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.export-import-btn:active {
+    transform: translateY(0);
+}
+
+.move-options {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    justify-content: center;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.move-btn {
+    width: 45px;
+    height: 45px;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.move-btn:hover {
+    transform: scale(1.1);
+    background: var(--primary-dark);
+}
+
+.move-btn:active {
+    transform: scale(0.95);
+}
+
+.move-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.5;
+}
+
+.move-btn.move-cancel {
+    background: #ff4757;
+}
+
+.move-btn.move-cancel:hover {
+    background: #ff3742;
+}
+
+/* Sección del gráfico */
+.chart-section {
+    margin-top: 24px;
+    background: var(--background-secondary);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+}
+
+.chart-section h4 {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+
+.chart-container {
+    width: 100%;
+    height: 140px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.chart-line {
+    fill: none;
+    stroke: var(--success-color);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 2px 6px rgba(78, 205, 196, 0.4));
+}
+
+.chart-line.negative-trend {
+    stroke: var(--danger-color);
+    filter: drop-shadow(0 2px 6px rgba(255, 107, 107, 0.4));
+}
+
+.chart-area {
+    opacity: 0.15;
+}
+
+.chart-grid-line {
+    stroke: rgba(255, 255, 255, 0.05);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+}
+
+.chart-point {
+    fill: var(--background-card);
+    stroke: var(--success-color);
+    stroke-width: 2.5;
+    transition: all 0.2s ease;
+}
+
+.chart-point.negative-trend {
+    stroke: var(--danger-color);
+}
+
+.chart-point:hover {
+    r: 6;
+    stroke-width: 3.5;
+    fill: var(--text-primary);
+}
+
+.chart-label {
+    font-size: 9px;
+    fill: var(--text-secondary);
+    font-weight: 500;
+}
+
+.chart-empty {
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* ===== ESTILOS PARA MENÚ Y REGLAS DE AUTOMATIZACIÓN ===== */
+.automation-btn {
+    position: absolute;
+    top: 75px;
+    right: 70px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    color: var(--text-primary);
+    font-size: 18px;
+    z-index: 10;
+}
+
+@media screen and (max-width: 768px) {
+    .automation-btn {
+        top: 85px;
+    }
+}
+
+@supports (padding: max(0px)) {
+    .automation-btn {
+        top: max(80px, env(safe-area-inset-top, 0px) + 45px);
+        right: calc(max(20px, env(safe-area-inset-right, 0px)) + 50px);
+    }
+}
+
+.automation-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.automation-rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+    margin-top: 10px;
+}
+
+.automation-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.automation-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(102, 126, 234, 0.4);
+}
+
+.automation-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.automation-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.automation-card-meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+
+.automation-card-schedule {
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+.automation-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 12px;
+}
+
+.automation-card-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+}
+
+.automation-card-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.automation-card-btn.delete:hover {
+    background: rgba(255, 107, 107, 0.2);
+    color: var(--danger-color);
+}
+
+.action-type-selector .btn-action {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.action-type-selector .btn-action.active-add {
+    background: var(--gradient-success) !important;
+    color: white !important;
+    border-color: var(--success-color) !important;
+    box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+}
+
+.action-type-selector .btn-action.active-remove {
+    background: var(--gradient-danger) !important;
+    color: white !important;
+    border-color: var(--danger-color) !important;
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
