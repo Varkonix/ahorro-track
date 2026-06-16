@@ -1,12 +1,141 @@
 {
+  "users": [
+    {
+      "id": "user_global_1",
+      "email": "user@example.com",
+      "passwordHash": "$2b$12$tQy2zYhK8XvW4rZ0N5uP1eF3k3x9Y7uV6o5i8N4a3d2c1b0"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "profile_1",
+      "userId": "user_global_1",
+      "name": "Principal",
+      "emoji": "👤",
+      "color": "#667eea"
+    }
+  ],
   "goals": [
     {
       "id": 101,
+      "profileId": "profile_1",
       "name": "Cuenta de Ahorro",
       "targetAmount": 100000.0,
-      "currentAmount": 99972.0,
+      "currentAmount": 99580.0,
       "currency": "USD",
       "transactions": [
+        {
+          "id": 1781575636.2973309,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-15T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297323,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-14T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297315,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-13T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297308,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-12T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297298,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-11T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.2972898,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-10T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297282,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-09T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.2972739,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-08T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297266,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-07T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297258,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-06T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297246,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-05T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.297236,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-04T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.2972229,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-03T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
+        {
+          "id": 1781575636.2971928,
+          "amount": -28.0,
+          "note": "Retiro automático - Nota: Luz",
+          "date": "2026-06-02T01:00:05",
+          "type": "remove",
+          "automationId": "rule_1"
+        },
         {
           "id": 1780362340.227244,
           "amount": -28.0,
@@ -23,12 +152,13 @@
     {
       "id": "rule_1",
       "goalId": 101,
+      "profileId": "profile_1",
       "actionType": "remove",
       "amount": 28.0,
       "frequency": "daily",
       "note": "Luz",
-      "lastRun": "2026-06-01T01:00:05",
-      "nextRun": "2026-06-02T01:00:05",
+      "lastRun": "2026-06-15T01:00:05",
+      "nextRun": "2026-06-16T01:00:05",
       "createdAt": "2026-06-01T21:04:31.123894"
     }
   ]

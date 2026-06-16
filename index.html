@@ -37,6 +37,10 @@
         <header class="header">
             <div class="header-left">
                 <h1>💰 Mis Ahorros</h1>
+                <div id="current-profile-badge" class="profile-badge-header" onclick="openProfileSelector()" style="cursor: pointer;">
+                    <span id="header-profile-emoji">👤</span>
+                    <span id="header-profile-name">Principal</span>
+                </div>
             </div>
             <button class="automation-btn" onclick="openAutomationMenu()" title="Menú de Automatizaciones">☰</button>
             <button class="settings-btn" onclick="openSettings()">⚙️</button>
@@ -110,6 +114,11 @@
                     <h4 data-translate="import">Importar</h4>
                     <input type="file" id="import-file" accept=".json" style="display: none;">
                     <button id="import-btn" class="export-import-btn" data-translate="import">Importar</button>
+                </div>
+                
+                <div class="settings-section">
+                    <h4>Perfiles</h4>
+                    <button id="profiles-btn" class="export-import-btn" onclick="openProfileSelector()" style="background: var(--gradient-success);">Gestionar Perfiles</button>
                 </div>
             </div>
             <div class="modal-footer">
@@ -192,6 +201,7 @@
                 <div class="action-buttons">
                     <button onclick="showAddMoney()" class="btn-action btn-add">Agregar</button>
                     <button onclick="showRemoveMoney()" class="btn-action btn-remove">Quitar</button>
+                    <button onclick="showTransferModal()" class="btn-action btn-transfer" style="background: var(--gradient-primary); color: white;">Transferir</button>
                     <button onclick="openEditGoal()" class="btn-action btn-edit">Editar</button>
                 </div>
                 <div class="chart-section">
@@ -369,6 +379,149 @@
             </div>
             <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end;">
                 <button class="btn-secondary" onclick="closeAutomationOptionModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Selector / Gestor de Perfiles ===== -->
+    <div id="profile-selector-modal" class="modal" style="display:none;">
+        <div class="modal-content profile-modal-content">
+            <div class="modal-header">
+                <h3 id="profile-modal-title">Mis Perfiles</h3>
+                <button class="back-btn" id="profile-close-btn" onclick="closeProfileSelector()" style="display:none;">←</button>
+            </div>
+            <div class="modal-body">
+                <div id="profiles-list" class="profiles-list">
+                    <!-- Se llena dinámicamente -->
+                </div>
+                <button class="btn-primary profile-add-btn" onclick="openCreateProfile()" style="width:100%;margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <span>➕</span> Nuevo Perfil
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Crear / Editar Perfil ===== -->
+    <div id="create-profile-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:380px;">
+            <div class="modal-header">
+                <button class="back-btn" onclick="closeCreateProfile()">←</button>
+                <h3 id="create-profile-title">Nuevo Perfil</h3>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="profile-edit-id">
+                <div class="form-group">
+                    <label for="profile-name-input">Nombre del perfil *</label>
+                    <input type="text" id="profile-name-input" placeholder="Ej: Personal, Negocios, Familia..." maxlength="30">
+                </div>
+                <div class="form-group">
+                    <label>Ícono del perfil</label>
+                    <div class="emoji-grid" id="emoji-grid">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                    <input type="hidden" id="profile-emoji-selected" value="👤">
+                </div>
+                <div class="form-group">
+                    <label>Color identificador</label>
+                    <div class="profile-color-grid" id="color-grid">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                    <input type="hidden" id="profile-color-selected" value="#6c63ff">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeCreateProfile()">Cancelar</button>
+                <button class="btn-primary" onclick="saveNewProfile()">Guardar Perfil</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Confirmar eliminar perfil ===== -->
+    <div id="confirm-delete-profile-modal" class="modal" style="display:none;">
+        <div class="modal-content confirm-modal" style="max-width:360px;">
+            <div class="modal-header">
+                <h3>Eliminar Perfil</h3>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar el perfil <strong id="delete-profile-name-label"></strong>?</p>
+                <p><strong style="color:var(--danger-color);">⚠️ Se eliminarán TODAS sus metas, transacciones y automatizaciones. Esta acción no se puede deshacer.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeConfirmDeleteProfile()">Cancelar</button>
+                <button class="btn-danger" onclick="executeDeleteProfile()">Eliminar Todo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para transferir dinero -->
+    <div id="transfer-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 440px;">
+            <div class="modal-header">
+                <button class="back-btn" onclick="closeTransferModal()">←</button>
+                <h3>Transferir Fondos</h3>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Cuenta de Origen</label>
+                    <input type="text" id="transfer-src-name" readonly style="opacity: 0.7; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);">
+                    <input type="hidden" id="transfer-src-id">
+                </div>
+
+                <div class="form-group">
+                    <label for="transfer-dest-profile">Perfil de Destino *</label>
+                    <select id="transfer-dest-profile" onchange="onTransferProfileChange()" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="transfer-dest-goal">Cuenta/Meta de Destino *</label>
+                    <select id="transfer-dest-goal" onchange="onTransferGoalChange()" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="transfer-amount">Monto a Enviar *</label>
+                    <input type="text" id="transfer-amount" placeholder="0.00" required>
+                </div>
+
+                <div class="form-group" id="transfer-exchange-section" style="display: none;">
+                    <label for="transfer-dest-amount">Monto a Recibir (Moneda de Destino) *</label>
+                    <input type="text" id="transfer-dest-amount" placeholder="0.00" required>
+                    <span id="transfer-rate-label" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;"></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="transfer-note">Nota/Concepto (opcional)</label>
+                    <input type="text" id="transfer-note" placeholder="Ej: Transferencia, Préstamo...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeTransferModal()">Cancelar</button>
+                <button class="btn-primary" onclick="saveTransferTransaction()">Confirmar Transferencia</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar transacción -->
+    <div id="edit-transaction-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 380px;">
+            <div class="modal-header">
+                <button class="back-btn" onclick="closeEditTransactionModal()">←</button>
+                <h3>Editar Transacción</h3>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-tx-id">
+                <input type="hidden" id="edit-tx-goal-id">
+                <div class="form-group">
+                    <label for="edit-tx-amount">Monto *</label>
+                    <input type="text" id="edit-tx-amount" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-tx-note">Nota/Concepto</label>
+                    <input type="text" id="edit-tx-note" placeholder="Concepto..." required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeEditTransactionModal()">Cancelar</button>
+                <button class="btn-primary" onclick="saveEditTransaction()">Guardar Cambios</button>
             </div>
         </div>
     </div>

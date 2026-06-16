@@ -1410,3 +1410,213 @@ button:focus-visible, input:focus-visible, select:focus-visible {
     border-color: var(--danger-color) !important;
     box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
 }
+
+/* ===== ESTILOS PARA GESTIÓN DE PERFILES Y TRANSFERENCIAS ===== */
+
+/* Listado de perfiles */
+.profiles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.profile-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--border-color);
+    border-radius: 14px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.profile-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.profile-card.active {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.profile-card-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.profile-card-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.profile-card-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.profile-card-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.profile-card-meta {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.profile-card-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: 8px;
+}
+
+.profile-card-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+}
+
+.profile-card-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.profile-card-btn.delete:hover {
+    background: rgba(255, 107, 107, 0.2);
+    color: var(--danger-color);
+}
+
+/* Grillas de emoji y color en creación */
+.emoji-grid, .profile-color-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.emoji-item {
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    height: 38px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.emoji-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+.emoji-item.selected {
+    background: rgba(102, 126, 234, 0.3);
+    border: 1.5px solid var(--primary-color);
+}
+
+.color-item {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    margin: 6px auto;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.color-item:hover {
+    transform: scale(1.2);
+}
+
+.color-item.selected {
+    border-color: white;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+/* Botón de edición de transacciones */
+.transaction-item {
+    position: relative;
+    padding-right: 48px; /* Espacio para el botón de editar */
+}
+
+.transaction-edit-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.transaction-item:hover .transaction-edit-btn {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.transaction-edit-btn:hover {
+    color: var(--text-primary);
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Badge de perfil actual en pantalla principal */
+.profile-badge-header {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    margin-top: 4px;
+    vertical-align: middle;
+}

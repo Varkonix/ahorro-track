@@ -9,6 +9,12 @@ const settings = {
 let currentGoalId = null;
 let currentMoneyAction = null;
 
+// Variables de perfiles
+let profiles = [];
+let currentProfileId = 'default_profile';
+let allGoals = []; // Almacena TODAS las metas de todos los perfiles
+let allAutomations = []; // Almacena TODAS las automatizaciones de todos los perfiles
+
 // Traducciones completas
 const translations = {
     es: {
@@ -444,10 +450,19 @@ function setupNumberFormatting(inputId) {
 }
 
 // ===== FUNCIONES DE ALMACENAMIENTO =====
+function mergeCurrentProfileGoals() {
+    allGoals = allGoals.filter(g => g.profileId !== currentProfileId);
+    goals.forEach(g => g.profileId = currentProfileId);
+    allGoals = allGoals.concat(goals);
+}
+
 function saveToStorage() {
     try {
-        localStorage.setItem("miAhorroMetas", JSON.stringify(goals));
+        mergeCurrentProfileGoals();
+        localStorage.setItem("miAhorroMetas", JSON.stringify(allGoals));
         localStorage.setItem("miAhorroSettings", JSON.stringify(settings));
+        localStorage.setItem("miAhorroProfiles", JSON.stringify(profiles));
+        localStorage.setItem("miAhorroCurrentProfileId", currentProfileId);
         console.log('✅ Datos guardados correctamente');
     } catch (error) {
         console.error('❌ Error guardando:', error);
@@ -456,16 +471,102 @@ function saveToStorage() {
 
 function loadFromStorage() {
     try {
-        const goalsData = localStorage.getItem("miAhorroMetas");
-        if (goalsData) goals = JSON.parse(goalsData);
+        const profilesData = localStorage.getItem("miAhorroProfiles");
+        const activeProfileData = localStorage.getItem("miAhorroCurrentProfileId");
+        
+        if (profilesData) {
+            profiles = JSON.parse(profilesData);
+        }
+        if (activeProfileData) {
+            currentProfileId = activeProfileData;
+        }
+
+        if (profiles.length === 0) {
+            console.log('⚠️ Creando perfil principal por defecto y migrando datos...');
+            const defaultProfile = {
+                id: 'default_profile',
+                name: 'Principal',
+                emoji: '👤',
+                color: '#667eea'
+            };
+            profiles.push(defaultProfile);
+            currentProfileId = 'default_profile';
+            
+            const rawGoals = localStorage.getItem("miAhorroMetas");
+            let tempGoals = rawGoals ? JSON.parse(rawGoals) : [];
+            tempGoals.forEach(g => {
+                if (!g.profileId) g.profileId = 'default_profile';
+            });
+            allGoals = tempGoals;
+            
+            const rawAutomations = localStorage.getItem("miAhorroAutomations");
+            let tempAutos = rawAutomations ? JSON.parse(rawAutomations) : [];
+            tempAutos.forEach(a => {
+                if (!a.profileId) a.profileId = 'default_profile';
+            });
+            allAutomations = tempAutos;
+
+            localStorage.setItem("miAhorroProfiles", JSON.stringify(profiles));
+            localStorage.setItem("miAhorroCurrentProfileId", currentProfileId);
+            localStorage.setItem("miAhorroMetas", JSON.stringify(allGoals));
+            localStorage.setItem("miAhorroAutomations", JSON.stringify(allAutomations));
+        } else {
+            const goalsData = localStorage.getItem("miAhorroMetas");
+            if (goalsData) {
+                allGoals = JSON.parse(goalsData);
+                allGoals.forEach(g => {
+                    if (!g.profileId) g.profileId = 'default_profile';
+                });
+            }
+            
+            const automationsData = localStorage.getItem("miAhorroAutomations");
+            if (automationsData) {
+                allAutomations = JSON.parse(automationsData);
+                allAutomations.forEach(a => {
+                    if (!a.profileId) a.profileId = 'default_profile';
+                });
+            }
+        }
         
         const settingsData = localStorage.getItem("miAhorroSettings");
         if (settingsData) Object.assign(settings, JSON.parse(settingsData));
+        
+        loadActiveProfileData();
         
         console.log('✅ Datos cargados correctamente');
     } catch (error) {
         console.error('❌ Error cargando:', error);
     }
+}
+
+function loadActiveProfileData() {
+    goals = allGoals.filter(g => g.profileId === currentProfileId);
+    automations = allAutomations.filter(a => a.profileId === currentProfileId);
+    updateProfileBadgeHeader();
+}
+
+function updateProfileBadgeHeader() {
+    const badge = document.getElementById("current-profile-badge");
+    const emojiSpan = document.getElementById("header-profile-emoji");
+    const nameSpan = document.getElementById("header-profile-name");
+    
+    const activeProf = profiles.find(p => p.id === currentProfileId);
+    if (activeProf && badge && emojiSpan && nameSpan) {
+        emojiSpan.textContent = activeProf.emoji;
+        nameSpan.textContent = activeProf.name;
+        badge.style.borderColor = activeProf.color;
+        badge.style.background = `rgba(${hexToRgb(activeProf.color)}, 0.15)`;
+    }
+}
+
+function hexToRgb(hex) {
+    if (!hex || hex[0] !== '#') return '102, 126, 234';
+    let c = hex.substring(1);
+    if (c.length === 3) {
+        c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    }
+    const num = parseInt(c, 16);
+    return `${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}`;
 }
 
 // ===== FUNCIONES DE CONFIGURACIÓN =====
@@ -1103,6 +1204,7 @@ function updateTransactionsList(goal) {
                     <span>${date}</span>
                     <span>${time}</span>
                 </div>
+                <button class="transaction-edit-btn" onclick="openEditTransactionModal(${goal.id}, ${transaction.id})" title="Editar Monto">✏️</button>
             </div>
         `;
     }).join('');
@@ -1270,7 +1372,6 @@ function handleFileImport(event) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Iniciando aplicación...');
     loadFromStorage();
-    loadAutomationsFromStorage();
     processAutomations();
     updateGoalsUI();
     updateTotals();
@@ -1281,6 +1382,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setupNumberFormatting('money-amount');
     setupNumberFormatting('edit-goal-amount');
     setupNumberFormatting('automation-amount');
+    setupNumberFormatting('transfer-amount');
+    setupNumberFormatting('transfer-dest-amount');
+    setupNumberFormatting('edit-tx-amount');
     
     // Configurar drag and drop después de cargar las metas
     setupDragAndDrop();
@@ -2239,20 +2343,20 @@ let pendingNoteChangeData = null;
 
 // Cargar y guardar en storage
 function loadAutomationsFromStorage() {
-    try {
-        const automationsData = localStorage.getItem("miAhorroAutomations");
-        if (automationsData) {
-            automations = JSON.parse(automationsData);
-            console.log('✅ Automatizaciones cargadas:', automations.length);
-        }
-    } catch (error) {
-        console.error('❌ Error cargando automatizaciones:', error);
-    }
+    // Las automatizaciones se cargan de forma consolidada en loadFromStorage()
+    console.log('ℹ️ Automatizaciones cargadas y aisladas por perfil.');
+}
+
+function mergeCurrentProfileAutomations() {
+    allAutomations = allAutomations.filter(a => a.profileId !== currentProfileId);
+    automations.forEach(a => a.profileId = currentProfileId);
+    allAutomations = allAutomations.concat(automations);
 }
 
 function saveAutomationsToStorage() {
     try {
-        localStorage.setItem("miAhorroAutomations", JSON.stringify(automations));
+        mergeCurrentProfileAutomations();
+        localStorage.setItem("miAhorroAutomations", JSON.stringify(allAutomations));
         console.log('✅ Automatizaciones guardadas');
     } catch (error) {
         console.error('❌ Error guardando automatizaciones:', error);
@@ -2702,4 +2806,541 @@ function executeAutomationImmediate(id) {
     renderAutomationsList();
     
     alert(`Ejecutado con éxito. Se aplicó el movimiento '${rule.note}' en tu cuenta.`);
+}
+
+// ===== FUNCIONES DEL SISTEMA DE MULTI-PERFILES (MULTI-PROFILE) =====
+
+const profileEmojis = ['👤', '💼', '🏠', '✈️', '🚗', '🛍️', '🎓', '🍔', '🎮', '❤️', '🐾', '💡'];
+const profileColors = ['#667eea', '#4ecdc4', '#feca57', '#ff6b6b', '#ff9ff3', '#45aaf2', '#2bcbba', '#20bf6b', '#a55eea', '#fed330', '#eb3b5a', '#fa8231'];
+
+function renderEmojiGrid(selectedEmoji = '👤') {
+    const grid = document.getElementById("emoji-grid");
+    if (!grid) return;
+    grid.innerHTML = profileEmojis.map(emoji => `
+        <span class="emoji-item ${emoji === selectedEmoji ? 'selected' : ''}" onclick="selectProfileEmoji(this, '${emoji}')">${emoji}</span>
+    `).join('');
+    document.getElementById("profile-emoji-selected").value = selectedEmoji;
+}
+
+function selectProfileEmoji(element, emoji) {
+    document.querySelectorAll(".emoji-item").forEach(item => item.classList.remove("selected"));
+    element.classList.add("selected");
+    document.getElementById("profile-emoji-selected").value = emoji;
+}
+
+function renderColorGrid(selectedColor = '#667eea') {
+    const grid = document.getElementById("color-grid");
+    if (!grid) return;
+    grid.innerHTML = profileColors.map(color => `
+        <div class="color-item ${color === selectedColor ? 'selected' : ''}" style="background-color: ${color};" onclick="selectProfileColor(this, '${color}')"></div>
+    `).join('');
+    document.getElementById("profile-color-selected").value = selectedColor;
+}
+
+function selectProfileColor(element, color) {
+    document.querySelectorAll(".color-item").forEach(item => item.classList.remove("selected"));
+    element.classList.add("selected");
+    document.getElementById("profile-color-selected").value = color;
+}
+
+function openProfileSelector() {
+    console.log('👤 Abriendo selector de perfiles...');
+    const modal = document.getElementById("profile-selector-modal");
+    if (!modal) return;
+    
+    const closeBtn = document.getElementById("profile-close-btn");
+    if (closeBtn) {
+        closeBtn.style.display = profiles.length > 0 ? "block" : "none";
+    }
+    
+    renderProfilesList();
+    modal.style.display = "flex";
+}
+
+function closeProfileSelector() {
+    const modal = document.getElementById("profile-selector-modal");
+    if (modal) modal.style.display = "none";
+}
+
+function renderProfilesList() {
+    const container = document.getElementById("profiles-list");
+    if (!container) return;
+    
+    container.innerHTML = profiles.map(prof => {
+        const profGoals = allGoals.filter(g => g.profileId === prof.id);
+        const goalCount = profGoals.length;
+        
+        const balancesByCurrency = {};
+        profGoals.forEach(g => {
+            balancesByCurrency[g.currency] = (balancesByCurrency[g.currency] || 0) + g.currentAmount;
+        });
+        
+        const balanceStrings = Object.entries(balancesByCurrency).map(([curr, amt]) => {
+            return formatCurrency(amt, curr);
+        });
+        
+        const balanceText = balanceStrings.length > 0 ? balanceStrings.join(' \| ') : 'Sin fondos';
+        const isActive = prof.id === currentProfileId;
+        
+        return `
+            <div class="profile-card ${isActive ? 'active' : ''}" onclick="selectProfile('${prof.id}')">
+                <div class="profile-card-left">
+                    <div class="profile-card-avatar" style="background-color: ${prof.color};">
+                        ${prof.emoji}
+                    </div>
+                    <div class="profile-card-details">
+                        <div class="profile-card-name">${prof.name}</div>
+                        <div class="profile-card-meta">${goalCount} ${goalCount === 1 ? 'cuenta' : 'cuentas'} • ${balanceText}</div>
+                    </div>
+                </div>
+                <div class="profile-card-actions" onclick="event.stopPropagation()">
+                    <button class="profile-card-btn" onclick="editProfile('${prof.id}')" title="Editar">✏️</button>
+                    ${profiles.length > 1 ? `<button class="profile-card-btn delete" onclick="confirmDeleteProfile('${prof.id}')" title="Eliminar">🗑️</button>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function selectProfile(profileId) {
+    if (profileId === currentProfileId) {
+        closeProfileSelector();
+        return;
+    }
+    
+    console.log(`🔄 Cambiando al perfil: ${profileId}`);
+    
+    mergeCurrentProfileGoals();
+    mergeCurrentProfileAutomations();
+    
+    currentProfileId = profileId;
+    localStorage.setItem("miAhorroCurrentProfileId", currentProfileId);
+    
+    currentGoalId = null;
+    currentMoneyAction = null;
+    
+    loadActiveProfileData();
+    updateGoalsUI();
+    updateTotals();
+    closeProfileSelector();
+    
+    if (navigator.vibrate) navigator.vibrate(40);
+    console.log(`✅ Perfil cambiado a: ${profileId}`);
+}
+
+function openCreateProfile(profileId = null) {
+    const modal = document.getElementById("create-profile-modal");
+    if (!modal) return;
+    
+    const title = document.getElementById("create-profile-title");
+    const nameInput = document.getElementById("profile-name-input");
+    const editIdInput = document.getElementById("profile-edit-id");
+    
+    if (profileId) {
+        const prof = profiles.find(p => p.id === profileId);
+        if (!prof) return;
+        
+        if (title) title.textContent = "Editar Perfil";
+        if (nameInput) nameInput.value = prof.name;
+        if (editIdInput) editIdInput.value = prof.id;
+        
+        renderEmojiGrid(prof.emoji);
+        renderColorGrid(prof.color);
+    } else {
+        if (title) title.textContent = "Nuevo Perfil";
+        if (nameInput) nameInput.value = "";
+        if (editIdInput) editIdInput.value = "";
+        
+        renderEmojiGrid('👤');
+        renderColorGrid('#667eea');
+    }
+    
+    modal.style.display = "flex";
+}
+
+function closeCreateProfile() {
+    const modal = document.getElementById("create-profile-modal");
+    if (modal) modal.style.display = "none";
+}
+
+function saveNewProfile() {
+    const nameInput = document.getElementById("profile-name-input");
+    const editIdInput = document.getElementById("profile-edit-id");
+    const emojiSelected = document.getElementById("profile-emoji-selected").value;
+    const colorSelected = document.getElementById("profile-color-selected").value;
+    
+    if (!nameInput) return;
+    const name = nameInput.value.trim();
+    
+    if (!name) {
+        alert("Por favor, ingresa un nombre para el perfil.");
+        return;
+    }
+    
+    const editId = editIdInput ? editIdInput.value : "";
+    
+    if (editId) {
+        const prof = profiles.find(p => p.id === editId);
+        if (prof) {
+            prof.name = name;
+            prof.emoji = emojiSelected;
+            prof.color = colorSelected;
+            console.log('✅ Perfil editado:', editId);
+        }
+    } else {
+        const newProf = {
+            id: 'profile_' + Date.now(),
+            name: name,
+            emoji: emojiSelected,
+            color: colorSelected
+        };
+        profiles.push(newProf);
+        console.log('✅ Nuevo perfil creado:', newProf.id);
+        selectProfile(newProf.id);
+    }
+    
+    saveToStorage();
+    renderProfilesList();
+    updateProfileBadgeHeader();
+    closeCreateProfile();
+}
+
+function editProfile(profileId) {
+    openCreateProfile(profileId);
+}
+
+let profileToDeleteId = null;
+
+function confirmDeleteProfile(profileId) {
+    const prof = profiles.find(p => p.id === profileId);
+    if (!prof) return;
+    
+    profileToDeleteId = profileId;
+    const label = document.getElementById("delete-profile-name-label");
+    if (label) label.textContent = prof.name;
+    
+    const modal = document.getElementById("confirm-delete-profile-modal");
+    if (modal) modal.style.display = "flex";
+}
+
+function closeConfirmDeleteProfile() {
+    const modal = document.getElementById("confirm-delete-profile-modal");
+    if (modal) modal.style.display = "none";
+    profileToDeleteId = null;
+}
+
+function executeDeleteProfile() {
+    if (!profileToDeleteId) return;
+    
+    if (profiles.length <= 1) {
+        alert("No puedes eliminar el único perfil existente.");
+        closeConfirmDeleteProfile();
+        return;
+    }
+    
+    console.log('🗑️ Eliminando perfil y sus datos:', profileToDeleteId);
+    
+    profiles = profiles.filter(p => p.id !== profileToDeleteId);
+    allGoals = allGoals.filter(g => g.profileId !== profileToDeleteId);
+    allAutomations = allAutomations.filter(a => a.profileId !== profileToDeleteId);
+    
+    if (currentProfileId === profileToDeleteId) {
+        currentProfileId = profiles[0].id;
+        localStorage.setItem("miAhorroCurrentProfileId", currentProfileId);
+    }
+    
+    localStorage.setItem("miAhorroProfiles", JSON.stringify(profiles));
+    localStorage.setItem("miAhorroCurrentProfileId", currentProfileId);
+    localStorage.setItem("miAhorroMetas", JSON.stringify(allGoals));
+    localStorage.setItem("miAhorroAutomations", JSON.stringify(allAutomations));
+    
+    loadActiveProfileData();
+    updateGoalsUI();
+    updateTotals();
+    
+    closeConfirmDeleteProfile();
+    renderProfilesList();
+}
+
+// ===== FUNCIONES PARA EDICIÓN MANUAL DE TRANSACCIONES =====
+
+function openEditTransactionModal(goalId, transactionId) {
+    console.log('✏️ Editando transacción:', transactionId, 'de cuenta:', goalId);
+    
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const tx = goal.transactions.find(t => t.id === transactionId);
+    if (!tx) return;
+    
+    document.getElementById("edit-tx-id").value = transactionId;
+    document.getElementById("edit-tx-goal-id").value = goalId;
+    
+    const amountInput = document.getElementById("edit-tx-amount");
+    const noteInput = document.getElementById("edit-tx-note");
+    
+    if (amountInput) {
+        amountInput.value = formatNumberInput(Math.abs(tx.amount).toString());
+    }
+    if (noteInput) {
+        noteInput.value = tx.note;
+    }
+    
+    const modal = document.getElementById("edit-transaction-modal");
+    if (modal) modal.style.display = "flex";
+}
+
+function closeEditTransactionModal() {
+    const modal = document.getElementById("edit-transaction-modal");
+    if (modal) modal.style.display = "none";
+}
+
+function saveEditTransaction() {
+    const txId = Number(document.getElementById("edit-tx-id").value);
+    const goalId = Number(document.getElementById("edit-tx-goal-id").value);
+    const amountInput = document.getElementById("edit-tx-amount");
+    const noteInput = document.getElementById("edit-tx-note");
+    
+    if (!amountInput || !noteInput) return;
+    
+    const newAmountAbs = parseFormattedNumber(amountInput.value);
+    const newNote = noteInput.value.trim();
+    
+    if (!newAmountAbs || newAmountAbs <= 0) {
+        alert("Por favor, ingresa un monto válido.");
+        return;
+    }
+    if (!newNote) {
+        alert("Por favor, ingresa una nota/concepto.");
+        return;
+    }
+    
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const tx = goal.transactions.find(t => t.id === txId);
+    if (!tx) return;
+    
+    const oldAmount = tx.amount;
+    const isPositive = oldAmount > 0;
+    
+    const newAmount = isPositive ? newAmountAbs : -newAmountAbs;
+    const diff = newAmount - oldAmount;
+    
+    tx.amount = newAmount;
+    tx.note = newNote;
+    
+    goal.currentAmount += diff;
+    if (goal.currentAmount < 0) goal.currentAmount = 0;
+    
+    saveToStorage();
+    updateGoalsUI();
+    updateTotals();
+    
+    if (currentGoalId === goalId) {
+        openGoalDetail(goalId);
+    }
+    
+    closeEditTransactionModal();
+    console.log('✅ Transacción editada. Diferencia de saldo aplicada:', diff);
+}
+
+// ===== FUNCIONES PARA TRANSFERENCIAS ENTRE CUENTAS Y PERFILES =====
+
+function showTransferModal() {
+    console.log('💸 Abriendo transferencia desde cuenta:', currentGoalId);
+    
+    const srcGoal = goals.find(g => g.id === currentGoalId);
+    if (!srcGoal) return;
+    
+    document.getElementById("transfer-src-name").value = `${srcGoal.name} (${srcGoal.currency}) - Saldo: ${formatCurrency(srcGoal.currentAmount, srcGoal.currency)}`;
+    document.getElementById("transfer-src-id").value = srcGoal.id;
+    
+    const destProfileSelect = document.getElementById("transfer-dest-profile");
+    if (destProfileSelect) {
+        destProfileSelect.innerHTML = profiles.map(p => `
+            <option value="${p.id}">${p.emoji} ${p.name} ${p.id === currentProfileId ? '(Este perfil)' : ''}</option>
+        `).join('');
+        destProfileSelect.value = currentProfileId;
+    }
+    
+    onTransferProfileChange();
+    
+    const modal = document.getElementById("transfer-modal");
+    if (modal) modal.style.display = "flex";
+}
+
+function closeTransferModal() {
+    const modal = document.getElementById("transfer-modal");
+    if (modal) modal.style.display = "none";
+}
+
+function onTransferProfileChange() {
+    const destProfileId = document.getElementById("transfer-dest-profile").value;
+    const destGoalSelect = document.getElementById("transfer-dest-goal");
+    const srcGoalId = Number(document.getElementById("transfer-src-id").value);
+    
+    if (!destGoalSelect) return;
+    
+    const destGoals = allGoals.filter(g => g.profileId === destProfileId);
+    const availableGoals = destGoals.filter(g => g.id !== srcGoalId);
+    
+    if (availableGoals.length === 0) {
+        destGoalSelect.innerHTML = `<option value="">Sin cuentas disponibles</option>`;
+    } else {
+        destGoalSelect.innerHTML = availableGoals.map(g => `
+            <option value="${g.id}">${g.name} (${g.currency})</option>
+        `).join('');
+    }
+    
+    onTransferGoalChange();
+}
+
+const mockExchangeRates = {
+    'USD_EUR': 0.92, 'EUR_USD': 1.09,
+    'USD_COP': 4000, 'COP_USD': 0.00025,
+    'EUR_COP': 4350, 'COP_EUR': 0.00023,
+    'USD_BRL': 5.40, 'BRL_USD': 0.19,
+    'USD_MXN': 18.20, 'MXN_USD': 0.055,
+    'USD_ARS': 900, 'ARS_USD': 0.0011,
+    'USD_CLP': 930, 'CLP_USD': 0.0011,
+    'USD_PEN': 3.75, 'PEN_USD': 0.27
+};
+
+function onTransferGoalChange() {
+    const srcGoalId = Number(document.getElementById("transfer-src-id").value);
+    const destGoalId = Number(document.getElementById("transfer-dest-goal").value);
+    
+    const srcGoal = allGoals.find(g => g.id === srcGoalId);
+    const destGoal = allGoals.find(g => g.id === destGoalId);
+    
+    const exchangeSection = document.getElementById("transfer-exchange-section");
+    const amountInput = document.getElementById("transfer-amount");
+    const destAmountInput = document.getElementById("transfer-dest-amount");
+    const rateLabel = document.getElementById("transfer-rate-label");
+    
+    if (!srcGoal || !destGoal) {
+        if (exchangeSection) exchangeSection.style.display = "none";
+        return;
+    }
+    
+    if (srcGoal.currency !== destGoal.currency) {
+        if (exchangeSection) exchangeSection.style.display = "block";
+        
+        const rateKey = `${srcGoal.currency}_${destGoal.currency}`;
+        let rate = mockExchangeRates[rateKey];
+        if (!rate) rate = 1.0;
+        
+        if (rateLabel) {
+            rateLabel.textContent = `Tasa sugerida: 1 ${srcGoal.currency} = ${rate.toFixed(4)} ${destGoal.currency}`;
+        }
+        
+        amountInput.oninput = function() {
+            amountInput.value = formatNumberInput(amountInput.value);
+            const srcAmt = parseFormattedNumber(amountInput.value);
+            if (srcAmt > 0) {
+                destAmountInput.value = formatNumberInput((srcAmt * rate).toFixed(2));
+            } else {
+                destAmountInput.value = "";
+            }
+        };
+        
+        destAmountInput.oninput = function() {
+            destAmountInput.value = formatNumberInput(destAmountInput.value);
+        };
+        
+    } else {
+        if (exchangeSection) exchangeSection.style.display = "none";
+        
+        amountInput.oninput = function() {
+            amountInput.value = formatNumberInput(amountInput.value);
+        };
+    }
+}
+
+function saveTransferTransaction() {
+    const srcGoalId = Number(document.getElementById("transfer-src-id").value);
+    const destGoalId = Number(document.getElementById("transfer-dest-goal").value);
+    const destProfileId = document.getElementById("transfer-dest-profile").value;
+    
+    const amountInput = document.getElementById("transfer-amount");
+    const destAmountInput = document.getElementById("transfer-dest-amount");
+    const noteInput = document.getElementById("transfer-note");
+    
+    if (!srcGoalId || !destGoalId) {
+        alert("Por favor, selecciona una cuenta destino válida.");
+        return;
+    }
+    
+    const srcGoal = allGoals.find(g => g.id === srcGoalId);
+    const destGoal = allGoals.find(g => g.id === destGoalId);
+    
+    if (!srcGoal || !destGoal) return;
+    
+    const srcAmount = parseFormattedNumber(amountInput.value);
+    if (!srcAmount || srcAmount <= 0) {
+        alert("Por favor, ingresa un monto válido a transferir.");
+        return;
+    }
+    
+    if (srcGoal.currentAmount < srcAmount) {
+        alert(`Saldo insuficiente. Tu saldo es ${formatCurrency(srcGoal.currentAmount, srcGoal.currency)}`);
+        return;
+    }
+    
+    let destAmount = srcAmount;
+    if (srcGoal.currency !== destGoal.currency) {
+        destAmount = parseFormattedNumber(destAmountInput.value);
+        if (!destAmount || destAmount <= 0) {
+            alert("Por favor, ingresa un monto de destino válido.");
+            return;
+        }
+    }
+    
+    const customNote = noteInput ? noteInput.value.trim() : "";
+    const noteText = customNote ? ` - ${customNote}` : "";
+    
+    const srcProfile = profiles.find(p => p.id === srcGoal.profileId);
+    const destProfile = profiles.find(p => p.id === destProfileId);
+    
+    const srcProfileName = srcProfile ? srcProfile.name : "Desconocido";
+    const destProfileName = destProfile ? destProfile.name : "Desconocido";
+    
+    const debitTx = {
+        id: Date.now(),
+        amount: -srcAmount,
+        note: `Transferencia enviada a [${destProfileName}] -> ${destGoal.name}${noteText}`,
+        date: new Date().toISOString(),
+        type: 'remove'
+    };
+    srcGoal.currentAmount -= srcAmount;
+    if (!srcGoal.transactions) srcGoal.transactions = [];
+    srcGoal.transactions.unshift(debitTx);
+    
+    const creditTx = {
+        id: Date.now() + 1,
+        amount: destAmount,
+        note: `Transferencia recibida desde [${srcProfileName}] -> ${srcGoal.name}${noteText}`,
+        date: new Date().toISOString(),
+        type: 'add'
+    };
+    destGoal.currentAmount += destAmount;
+    if (!destGoal.transactions) destGoal.transactions = [];
+    destGoal.transactions.unshift(creditTx);
+    
+    saveToStorage();
+    
+    if (destProfileId === currentProfileId) {
+        loadActiveProfileData();
+    } else {
+        goals = allGoals.filter(g => g.profileId === currentProfileId);
+    }
+    
+    updateGoalsUI();
+    updateTotals();
+    closeTransferModal();
+    closeGoalDetail();
+    
+    if (navigator.vibrate) navigator.vibrate([40, 80, 40]);
+    alert("¡Transferencia realizada con éxito!");
 }

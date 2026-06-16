@@ -3,15 +3,39 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+# Configurar encoding UTF-8 en consola para evitar UnicodeEncodeError en Windows
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 DB_PATH = os.path.join(os.path.dirname(__file__), 'db.json')
 
 def load_db():
     if not os.path.exists(DB_PATH):
         # Initial database state
         initial_data = {
+            "users": [
+                {
+                    "id": "user_global_1",
+                    "email": "user@example.com",
+                    "passwordHash": "$2b$12$tQy2zYhK8XvW4rZ0N5uP1eF3k3x9Y7uV6o5i8N4a3d2c1b0"
+                }
+            ],
+            "profiles": [
+                {
+                    "id": "profile_1",
+                    "userId": "user_global_1",
+                    "name": "Principal",
+                    "emoji": "👤",
+                    "color": "#667eea"
+                }
+            ],
             "goals": [
                 {
                     "id": 101,
+                    "profileId": "profile_1",
                     "name": "Cuenta de Ahorro",
                     "targetAmount": 100000.0,
                     "currentAmount": 100000.0,  # Initial balance 100,000 according to requirement
@@ -24,6 +48,7 @@ def load_db():
                 {
                     "id": "rule_1",
                     "goalId": 101,
+                    "profileId": "profile_1",
                     "actionType": "remove",  # Retiro (-)
                     "amount": 28.0,  # Discount of 28 daily
                     "frequency": "daily",
@@ -84,6 +109,11 @@ def run_automations():
 
         if not goal:
             print(f"Warning: Meta vinculada {rule['goalId']} no encontrada para la regla '{rule['note']}'.")
+            continue
+
+        # Seguridad de multi-tenancy a nivel de perfil
+        if goal.get("profileId") != rule.get("profileId"):
+            print(f"❌ ALERTA DE SEGURIDAD: La regla '{rule['note']}' (Perfil: {rule.get('profileId')}) intentó operar en la cuenta '{goal['name']}' (Perfil: {goal.get('profileId')}). Operación cancelada.")
             continue
 
         while now >= next_run_date:
@@ -162,10 +192,15 @@ def edit_automation_note(rule_id, new_note, option):
 
 def show_status():
     db = load_db()
-    print("\n===== ESTADO DE LA BASE DE DATOS =====")
+    print("\n===== ESTADO DE LA BASE DE DATOS (MULTI-PERFIL) =====")
+    print(f"Usuarios globales: {len(db.get('users', []))}")
+    print(f"Perfiles activos: {len(db.get('profiles', []))}")
+    for p in db.get("profiles", []):
+        print(f"  * [{p['id']}] {p['emoji']} {p['name']} (Usuario: {p['userId']})")
+    
     print(f"\nCuentas/Metas ({len(db['goals'])}):")
     for goal in db["goals"]:
-        print(f"- [ID: {goal['id']}] {goal['name']}: Saldo actual = {goal['currentAmount']} {goal['currency']}")
+        print(f"- [ID: {goal['id']}] [Perfil: {goal.get('profileId')}] {goal['name']}: Saldo actual = {goal['currentAmount']} {goal['currency']}")
         txs = goal.get("transactions", [])
         print(f"  Historial de Transacciones ({len(txs)}):")
         for tx in txs[:5]:

@@ -21,9 +21,26 @@ function loadDB() {
     if (!fs.existsSync(DB_PATH)) {
         // Inicializar base de datos vacía si no existe
         const initialData = {
+            users: [
+                {
+                    id: "user_global_1",
+                    email: "user@example.com",
+                    passwordHash: "$2b$12$tQy2zYhK8XvW4rZ0N5uP1eF3k3x9Y7uV6o5i8N4a3d2c1b0"
+                }
+            ],
+            profiles: [
+                {
+                    id: "profile_1",
+                    userId: "user_global_1",
+                    name: "Principal",
+                    emoji: "👤",
+                    color: "#667eea"
+                }
+            ],
             goals: [
                 {
                     id: 101,
+                    profileId: "profile_1",
                     name: "Cuenta de Ahorro",
                     targetAmount: 100000,
                     currentAmount: 100000, // Saldo inicial 100,000 según el ejemplo
@@ -36,6 +53,7 @@ function loadDB() {
                 {
                     id: "rule_1",
                     goalId: 101,
+                    profileId: "profile_1",
                     actionType: "remove", // Retiro (-)
                     amount: 28, // Descuento de 28 diario según el ejemplo
                     frequency: "daily",
@@ -99,6 +117,12 @@ function runAutomations() {
 
         if (!goal) {
             console.log(`⚠️ Meta vinculada ${rule.goalId} no encontrada para la regla '${rule.note}'.`);
+            return;
+        }
+
+        // Validación de seguridad estricta: Aislamiento a nivel de perfil
+        if (goal.profileId !== rule.profileId) {
+            console.log(`❌ ALERTA DE SEGURIDAD: La regla '${rule.note}' (Perfil: ${rule.profileId}) intentó operar en la cuenta '${goal.name}' (Perfil: ${goal.profileId}). Operación cancelada.`);
             return;
         }
 
@@ -196,11 +220,19 @@ function editAutomationNote(ruleId, newNote, option) {
 // 3. Mostrar Estado
 function showStatus() {
     const db = loadDB();
-    console.log(`\n===== ESTADO DE LA BASE DE DATOS =====`);
+    console.log(`\n===== ESTADO DE LA BASE DE DATOS (MULTI-PERFIL) =====`);
+    
+    console.log(`Usuarios globales: ${db.users ? db.users.length : 0}`);
+    console.log(`Perfiles activos: ${db.profiles ? db.profiles.length : 0}`);
+    if (db.profiles) {
+        db.profiles.forEach(p => {
+            console.log(`  * [${p.id}] ${p.emoji} ${p.name} (Usuario: ${p.userId})`);
+        });
+    }
     
     console.log(`\nCuentas/Metas (${db.goals.length}):`);
     db.goals.forEach(goal => {
-        console.log(`- [ID: ${goal.id}] ${goal.name}: Saldo actual = ${goal.currentAmount} ${goal.currency}`);
+        console.log(`- [ID: ${goal.id}] [Perfil: ${goal.profileId}] ${goal.name}: Saldo actual = ${goal.currentAmount} ${goal.currency}`);
         console.log(`  Historial de Transacciones (${goal.transactions ? goal.transactions.length : 0}):`);
         if (goal.transactions && goal.transactions.length > 0) {
             goal.transactions.slice(0, 5).forEach(tx => {
