@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ahorroapp-v3';
+const CACHE_NAME = 'ahorroapp-v4';
 const urlsToCache = [
   './',
   './index.html',
