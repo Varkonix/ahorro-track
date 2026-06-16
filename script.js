@@ -20,8 +20,8 @@ const translations = {
     es: {
         // Textos principales
         'app-title': 'MiAhorro - Tus Metas de Ahorro',
-        'total-savings': '💰 ahorros totales',
-        'total-saved': 'Total Ahorrado',
+        'total-savings': '💰 Ahorro Track',
+        'total-saved': 'Ahorro Track',
         'my-goals': 'Mis Metas',
         'start-saving-adventure': '¡Comienza tu aventura de ahorro!',
         'tap-plus-button': 'Toca el botón + para crear tu primera meta',
@@ -93,8 +93,8 @@ const translations = {
     en: {
         // Main texts
         'app-title': 'MySavings - Your Savings Goals',
-        'total-savings': '💰 total savings',
-        'total-saved': 'Total Saved',
+        'total-savings': '💰 Ahorro Track',
+        'total-saved': 'Ahorro Track',
         'my-goals': 'My Goals',
         'start-saving-adventure': 'Start your savings journey!',
         'tap-plus-button': 'Tap the + button to create your first goal',
@@ -166,8 +166,8 @@ const translations = {
     pt: {
         // Textos principais
         'app-title': 'MinhasPoupanças - Suas Metas de Poupança',
-        'total-savings': '💰 poupanças totais',
-        'total-saved': 'Total Poupado',
+        'total-savings': '💰 Ahorro Track',
+        'total-saved': 'Ahorro Track',
         'my-goals': 'Minhas Metas',
         'start-saving-adventure': 'Comece sua jornada de poupança!',
         'tap-plus-button': 'Toque no botão + para criar sua primeira meta',
@@ -239,8 +239,8 @@ const translations = {
     que: {
         // Textos principales
         'app-title': 'Qolqe Waqaychay - Qampa Metakuna',
-        'total-savings': '💰 llapan qolqe waqaychasqa',
-        'total-saved': 'Llapan Waqaychasqa',
+        'total-savings': '💰 Ahorro Track',
+        'total-saved': 'Ahorro Track',
         'my-goals': 'Ñuqapa Metakuna',
         'start-saving-adventure': '¡Qolqe waqaychay puriyta qallariy!',
         'tap-plus-button': '+ botonta ñit\'iy ñawpaq metaykita ruwanapaq',
@@ -1397,410 +1397,239 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Aplicación inicializada correctamente');
 });
 
+// ===== DRAG AND DROP - GHOST CLONE (ZERO LAG MÓVIL) =====
 // Variables globales para drag and drop
-let draggedElement = null;
+let draggedElement = null;   // tarjeta original (placeholder invisible)
+let dragGhost = null;        // clon flotante que sigue el dedo
 let startY = 0;
 let currentY = 0;
 let initialIndex = -1;
+let targetDropIndex = -1;    // índice donde soltar (calculado en move)
 let isDragging = false;
 let touchTimeout = null;
-let dragStartTime = 0;
 let isLongPress = false;
-
-// Variables de optimización para evitar layout thrashing
-let cachedPositions = [];
-let initialDraggedCenter = 0;
 let isTicking = false;
+let cardSnapPoints = [];     // centros Y de cada tarjeta (calculado 1 vez al iniciar)
 
-// Función para cachear posiciones de tarjetas y evitar getBoundingClientRect repetidos
-function cachePositions() {
-    const goalCards = Array.from(document.querySelectorAll('.goal-card'));
-    const draggedIndex = goalCards.indexOf(draggedElement);
-    cachedPositions = goalCards.map((card, idx) => {
-        const rect = card.getBoundingClientRect();
-        return {
-            element: card,
-            index: idx,
-            top: rect.top,
-            bottom: rect.bottom,
-            height: rect.height,
-            center: rect.top + rect.height / 2
-        };
-    });
-    
-    if (draggedIndex !== -1 && cachedPositions[draggedIndex]) {
-        initialDraggedCenter = cachedPositions[draggedIndex].center;
-    }
-}
-
-// Funciones para drag and drop con soporte táctil y mouse
 function setupDragAndDrop() {
     const goalCards = document.querySelectorAll('.goal-card');
-    console.log('🔧 Configurando drag táctil y mouse para', goalCards.length, 'tarjetas');
-    
-    goalCards.forEach((card, index) => {
+
+    goalCards.forEach((card) => {
         const dragHandle = card.querySelector('.drag-handle');
-        
-        if (!dragHandle) {
-            console.warn('❌ No drag-handle en tarjeta', index);
-            return;
-        }
-        
-        // Limpiar eventos anteriores
+        if (!dragHandle) return;
+
+        // Limpiar listeners anteriores clonando el nodo
         dragHandle.replaceWith(dragHandle.cloneNode(true));
         const newHandle = card.querySelector('.drag-handle');
-        
-        // Eventos táctiles
-        newHandle.addEventListener('touchstart', function(e) {
-            startDragWithLongPress(e, card, 'touch');
-        }, { passive: false });
-        
-        // Eventos de mouse
-        newHandle.addEventListener('mousedown', function(e) {
-            startDragWithLongPress(e, card, 'mouse');
-        }, { passive: false });
-        
-        // Prevenir comportamientos por defecto
-        newHandle.addEventListener('click', function(e) {
-            if (isLongPress) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        });
-        
-        newHandle.addEventListener('dragstart', function(e) {
-            e.preventDefault();
-        });
+
+        newHandle.addEventListener('touchstart', (e) => onDragStart(e, card, 'touch'), { passive: false });
+        newHandle.addEventListener('mousedown',  (e) => onDragStart(e, card, 'mouse'), { passive: false });
+        newHandle.addEventListener('dragstart',  (e) => e.preventDefault());
     });
 }
 
-function startDragWithLongPress(e, card, inputType) {
+function onDragStart(e, card, inputType) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const handle = card.querySelector('.drag-handle');
-    const currentIndex = parseInt(card.dataset.index);
-    
-    console.log('🎯 Iniciando long press para meta', currentIndex, 'tipo:', inputType);
-    
-    // Reset variables
-    isLongPress = false;
-    dragStartTime = Date.now();
-    
-    // Obtener posición inicial
+    handle.classList.add('pressing');
+
     const clientY = inputType === 'touch' ? e.touches[0].clientY : e.clientY;
     startY = clientY;
     currentY = clientY;
-    
-    // Feedback visual inmediato
-    handle.classList.add('pressing');
-    
-    // Timer para activar drag (300ms para mouse, 500ms para touch)
-    const longPressDelay = inputType === 'mouse' ? 300 : 500;
-    
+    isLongPress = false;
+
+    // Activar drag tras mantener presionado 300ms
     touchTimeout = setTimeout(() => {
-        console.log('✅ Long press activado!');
         isLongPress = true;
-        
-        // Cambiar estado visual
         handle.classList.remove('pressing');
         handle.classList.add('drag-active');
-        card.classList.add('dragging');
-        
-        // Vibración solo para touch
-        if (inputType === 'touch' && navigator.vibrate) {
-            navigator.vibrate(50);
-        }
-        
-        // Configurar variables de drag
-        draggedElement = card;
-        initialIndex = currentIndex;
-        isDragging = true;
-        
-        // Inicializar caché de posiciones al empezar el arrastre
-        cachePositions();
-        
-        // Configurar eventos de movimiento según el tipo de input
-        if (inputType === 'touch') {
-            document.addEventListener('touchmove', handleMove, { passive: false });
-            document.addEventListener('touchend', finalizeDrag, { once: true });
-        } else {
-            document.addEventListener('mousemove', handleMove, { passive: false });
-            document.addEventListener('mouseup', finalizeDrag, { once: true });
-        }
-        
-    }, longPressDelay);
-    
-    // Función para cancelar el long press
-    function cancelLongPress() {
-        if (touchTimeout) {
-            clearTimeout(touchTimeout);
-            touchTimeout = null;
-        }
+
+        if (navigator.vibrate) navigator.vibrate(40);
+
+        activateGhostDrag(card, inputType);
+    }, 300);
+
+    // Cancelar si el dedo se mueve antes del long press
+    const abortMove = (ev) => {
+        const y = inputType === 'touch' ? (ev.touches?.[0]?.clientY ?? currentY) : ev.clientY;
+        if (Math.abs(y - startY) > 8) abort();
+    };
+    const abortUp = () => abort();
+
+    const moveEvt = inputType === 'touch' ? 'touchmove' : 'mousemove';
+    const upEvt   = inputType === 'touch' ? 'touchend'  : 'mouseup';
+
+    document.addEventListener(moveEvt, abortMove, { passive: true });
+    document.addEventListener(upEvt,   abortUp,   { once: true });
+
+    function abort() {
+        clearTimeout(touchTimeout);
         handle.classList.remove('pressing', 'drag-active');
-        card.classList.remove('dragging');
-        console.log('❌ Long press cancelado');
-    }
-    
-    // Eventos para cancelar el long press
-    if (inputType === 'touch') {
-        const cancelEvents = ['touchend', 'touchcancel', 'touchmove'];
-        cancelEvents.forEach(eventType => {
-            document.addEventListener(eventType, function cancelHandler(e) {
-                if (eventType === 'touchmove') {
-                    const moveY = e.touches[0].clientY;
-                    const distance = Math.abs(moveY - startY);
-                    if (distance > 10) { // Si se mueve más de 10px, cancelar
-                        cancelLongPress();
-                        cancelEvents.forEach(et => {
-                            document.removeEventListener(et, cancelHandler);
-                        });
-                    }
-                } else {
-                    if (!isDragging) {
-                        cancelLongPress();
-                    }
-                    cancelEvents.forEach(et => {
-                        document.removeEventListener(et, cancelHandler);
-                    });
-                }
-            }, { once: eventType !== 'touchmove' });
-        });
-    } else {
-        const cancelEvents = ['mouseup', 'mouseleave', 'mousemove'];
-        cancelEvents.forEach(eventType => {
-            document.addEventListener(eventType, function cancelHandler(e) {
-                if (eventType === 'mousemove') {
-                    const distance = Math.abs(e.clientY - startY);
-                    if (distance > 10) {
-                        cancelLongPress();
-                        cancelEvents.forEach(et => {
-                            document.removeEventListener(et, cancelHandler);
-                        });
-                    }
-                } else {
-                    if (!isDragging) {
-                        cancelLongPress();
-                    }
-                    cancelEvents.forEach(et => {
-                        document.removeEventListener(et, cancelHandler);
-                    });
-                }
-            }, { once: eventType !== 'mousemove' });
-        });
+        document.removeEventListener(moveEvt, abortMove);
+        document.removeEventListener(upEvt,   abortUp);
     }
 }
 
-function handleMove(e) {
-    if (!isDragging || !draggedElement) return;
-    
+function activateGhostDrag(card, inputType) {
+    isDragging = true;
+    draggedElement = card;
+    initialIndex = parseInt(card.dataset.index);
+    targetDropIndex = initialIndex;
+
+    // ── 1. Calcular snap points (centros Y de cada tarjeta) ──
+    // Solo se hace UNA VEZ al iniciar el drag — cero getBoundingClientRect durante el move
+    const allCards = Array.from(document.querySelectorAll('.goal-card'));
+    cardSnapPoints = allCards.map((c) => {
+        const r = c.getBoundingClientRect();
+        return { element: c, centerY: r.top + r.height / 2, height: r.height };
+    });
+
+    // ── 2. Crear clon flotante (ghost) ──
+    const rect = card.getBoundingClientRect();
+    dragGhost = card.cloneNode(true);
+    dragGhost.style.cssText = `
+        position: fixed;
+        left: ${rect.left}px;
+        top: ${rect.top}px;
+        width: ${rect.width}px;
+        height: ${rect.height}px;
+        margin: 0;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.92;
+        box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+        border-radius: 16px;
+        transform: scale(1.03);
+        transition: none;
+        will-change: transform;
+    `;
+    document.body.appendChild(dragGhost);
+
+    // ── 3. Ocultar tarjeta original como placeholder ──
+    card.style.opacity = '0';
+    card.style.pointerEvents = 'none';
+
+    // ── 4. Registrar eventos de movimiento y soltar ──
+    if (inputType === 'touch') {
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend',  onDragEnd,  { once: true });
+        document.addEventListener('touchcancel', onDragEnd, { once: true });
+    } else {
+        document.addEventListener('mousemove', onDragMove, { passive: false });
+        document.addEventListener('mouseup',   onDragEnd,  { once: true });
+    }
+}
+
+function onDragMove(e) {
+    if (!isDragging) return;
     e.preventDefault();
-    
-    // Obtener posición actual
-    const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-    currentY = clientY;
-    
-    // Usar requestAnimationFrame para evitar lag y sincronizar el dibujado
+
+    currentY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+
+    // Throttle con rAF — solo 1 actualización visual por frame
     if (!isTicking) {
-        window.requestAnimationFrame(() => {
-            updateDragPosition();
-            isTicking = false;
-        });
+        requestAnimationFrame(renderDragFrame);
         isTicking = true;
     }
 }
 
-function updateDragPosition() {
-    if (!isDragging || !draggedElement) return;
-    
-    // Calcular desplazamiento 1:1 sin límites arbitrarios
+function renderDragFrame() {
+    isTicking = false;
+    if (!isDragging || !dragGhost) return;
+
+    // Mover el ghost — SOLO CSS transform, cero layout
     const deltaY = currentY - startY;
-    
-    // Mover visualmente el elemento
-    draggedElement.style.transform = `translateY(${deltaY}px) scale(1.02)`;
-    draggedElement.style.zIndex = '1000';
-    
-    // Calcular el centro del elemento arrastrado usando la posición matemática acumulada
-    const draggedCenter = initialDraggedCenter + deltaY;
-    
-    // Encontrar índice del elemento arrastrado en cachedPositions
-    const draggedIndex = cachedPositions.findIndex(item => item.element === draggedElement);
-    if (draggedIndex === -1) return;
-    
-    let targetCard = null;
-    let targetIndex = -1;
-    
-    // Buscar la tarjeta sobre la que estamos en base al caché
-    for (let i = 0; i < cachedPositions.length; i++) {
-        if (i === draggedIndex) continue;
-        
-        const cardData = cachedPositions[i];
-        
-        if (draggedIndex < i) {
-            // Moviendo hacia abajo
-            if (draggedCenter > cardData.center) {
-                targetCard = cardData.element;
-                targetIndex = i;
-            }
+    dragGhost.style.transform = `translateY(${deltaY}px) scale(1.03)`;
+
+    // Calcular a qué slot apunta el dedo (usando centros pre-cacheados)
+    const ghostCenterY = currentY;
+    let closest = initialIndex;
+    let minDist = Infinity;
+    cardSnapPoints.forEach((snap, idx) => {
+        const dist = Math.abs(ghostCenterY - snap.centerY);
+        if (dist < minDist) {
+            minDist = dist;
+            closest = idx;
+        }
+    });
+    targetDropIndex = closest;
+
+    // Mostrar indicador visual en tarjetas (desplazamiento suave con CSS)
+    cardSnapPoints.forEach((snap, idx) => {
+        if (snap.element === draggedElement) return;
+        if (idx >= Math.min(initialIndex, targetDropIndex) && idx <= Math.max(initialIndex, targetDropIndex)) {
+            const shift = initialIndex < targetDropIndex ? -snap.height - 16 : snap.height + 16;
+            snap.element.style.transition = 'transform 0.18s ease';
+            snap.element.style.transform = `translateY(${shift}px)`;
         } else {
-            // Moviendo hacia arriba
-            if (draggedCenter < cardData.center) {
-                targetCard = cardData.element;
-                targetIndex = i;
-                break;
-            }
+            snap.element.style.transition = 'transform 0.18s ease';
+            snap.element.style.transform = '';
         }
-    }
-    
-    // Si no se encontró, buscar por proximidad del cursor usando el caché
-    if (!targetCard) {
-        for (let i = 0; i < cachedPositions.length; i++) {
-            if (i === draggedIndex) continue;
-            const cardData = cachedPositions[i];
-            
-            if (Math.abs(currentY - cardData.center) < cardData.height * 0.4) {
-                targetCard = cardData.element;
-                targetIndex = i;
-                break;
-            }
-        }
-    }
-    
-    // Si encontramos un objetivo válido, intercambiar en el DOM y en el array
-    if (targetCard && targetIndex !== draggedIndex) {
-        console.log(`🔄 Intercambiando posición DOM ${draggedIndex} con ${targetIndex}`);
-        
-        // Intercambiar en el array de goals
-        const temp = goals[draggedIndex];
-        goals[draggedIndex] = goals[targetIndex];
-        goals[targetIndex] = temp;
-        
-        // FLIP technique para animar la tarjeta que se mueve (targetCard)
-        const rectBefore = targetCard.getBoundingClientRect();
-        
-        // Reordenar en el DOM
-        const container = document.getElementById('goals-container');
-        if (targetIndex < draggedIndex) {
-            container.insertBefore(draggedElement, targetCard);
-        } else {
-            container.insertBefore(draggedElement, targetCard.nextSibling);
-        }
-        
-        const rectAfter = targetCard.getBoundingClientRect();
-        
-        // Ajustar startY para evitar saltos en la posición visual del draggedElement
-        const heightDifference = rectBefore.top - rectAfter.top;
-        startY += heightDifference;
-        
-        // Aplicar invert transform instantáneamente a la tarjeta que cambió de posición (no la arrastrada)
-        const invertY = rectBefore.top - rectAfter.top;
-        targetCard.style.transition = 'none';
-        targetCard.style.transform = `translateY(${invertY}px)`;
-        
-        // Forzar reflow
-        targetCard.offsetHeight;
-        
-        // Animar la tarjeta de vuelta a su posición natural
-        targetCard.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
-        targetCard.style.transform = '';
-        
-        // Limpiar la transición inline después de que termine
-        const cardToReset = targetCard;
-        setTimeout(() => {
-            if (cardToReset) {
-                cardToReset.style.transition = '';
-            }
-        }, 250);
-        
-        // IMPORTANTE: Actualizar el caché de posiciones ya que la estructura en el DOM cambió
-        cachePositions();
-        
-        // Actualizar el transform de la arrastrada con el nuevo startY ajustado
-        const newDeltaY = currentY - startY;
-        draggedElement.style.transform = `translateY(${newDeltaY}px) scale(1.02)`;
-        
-        // Vibración de feedback suave
-        if (navigator.vibrate) {
-            navigator.vibrate(15);
-        }
-    }
+    });
 }
 
-function finalizeDrag(e) {
-    console.log('🏁 Finalizando drag');
-    
-    // Limpiar timeout si existe
-    if (touchTimeout) {
-        clearTimeout(touchTimeout);
-        touchTimeout = null;
+function onDragEnd(e) {
+    if (!isDragging) return;
+
+    // ── Limpiar listeners ──
+    document.removeEventListener('touchmove',   onDragMove);
+    document.removeEventListener('mousemove',   onDragMove);
+    document.removeEventListener('touchend',    onDragEnd);
+    document.removeEventListener('touchcancel', onDragEnd);
+    document.removeEventListener('mouseup',     onDragEnd);
+
+    // ── Eliminar ghost ──
+    if (dragGhost) {
+        dragGhost.remove();
+        dragGhost = null;
     }
-    
-    // Remover event listeners
-    document.removeEventListener('touchmove', handleMove);
-    document.removeEventListener('mousemove', handleMove);
-    document.removeEventListener('touchend', finalizeDrag);
-    document.removeEventListener('mouseup', finalizeDrag);
-    
+
+    // ── Restaurar estilos de todas las tarjetas ──
+    cardSnapPoints.forEach((snap) => {
+        snap.element.style.transition = '';
+        snap.element.style.transform  = '';
+    });
+
     if (draggedElement) {
-        // Restaurar estilos
-        draggedElement.style.transform = '';
-        draggedElement.style.zIndex = '';
-        
-        // Remover clases de estado
+        draggedElement.style.opacity = '';
+        draggedElement.style.pointerEvents = '';
         const handle = draggedElement.querySelector('.drag-handle');
-        if (handle) {
-            handle.classList.remove('pressing', 'drag-active');
-        }
-        draggedElement.classList.remove('dragging');
-        
-        // Vibración de confirmación (solo touch)
-        if (e.type.includes('touch') && navigator.vibrate) {
-            navigator.vibrate([30, 50, 30]);
-        }
+        if (handle) handle.classList.remove('pressing', 'drag-active');
     }
-    
-    // Guardar cambios y actualizar UI
-    if (isDragging) {
+
+    // ── Reordenar array y DOM (solo 1 vez al soltar) ──
+    if (targetDropIndex !== initialIndex && targetDropIndex !== -1) {
+        const goal = goals.splice(initialIndex, 1)[0];
+        goals.splice(targetDropIndex, 0, goal);
+        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
         saveToStorage();
         updateGoalsUI();
-        console.log('✅ Cambios guardados');
     }
-    
-    // Reset variables
+
+    // ── Reset ──
     draggedElement = null;
     isDragging = false;
     isLongPress = false;
+    isTicking = false;
     startY = 0;
     currentY = 0;
     initialIndex = -1;
-    cachedPositions = [];
-    isTicking = false;
+    targetDropIndex = -1;
+    cardSnapPoints = [];
 }
-
-
 
 function moveGoal(fromIndex, toIndex) {
-    if (toIndex < 0 || toIndex >= goals.length || fromIndex === toIndex) {
-        return;
-    }
-    
-    console.log(`🔄 Moviendo meta de posición ${fromIndex} a ${toIndex}`);
-    
-    // Mover en el array
+    if (toIndex < 0 || toIndex >= goals.length || fromIndex === toIndex) return;
     const goal = goals.splice(fromIndex, 1)[0];
     goals.splice(toIndex, 0, goal);
-    
-    // Vibración de confirmación
-    if (navigator.vibrate) {
-        navigator.vibrate([30, 50, 30]);
-    }
-    
-    // Guardar y actualizar
+    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
     saveToStorage();
     updateGoalsUI();
-    
-    console.log('✅ Meta movida exitosamente');
 }
+
+
 
 // Service Worker
 if ('serviceWorker' in navigator) {
