@@ -1407,6 +1407,32 @@ let touchTimeout = null;
 let dragStartTime = 0;
 let isLongPress = false;
 
+// Variables de optimización para evitar layout thrashing
+let cachedPositions = [];
+let initialDraggedCenter = 0;
+let isTicking = false;
+
+// Función para cachear posiciones de tarjetas y evitar getBoundingClientRect repetidos
+function cachePositions() {
+    const goalCards = Array.from(document.querySelectorAll('.goal-card'));
+    const draggedIndex = goalCards.indexOf(draggedElement);
+    cachedPositions = goalCards.map((card, idx) => {
+        const rect = card.getBoundingClientRect();
+        return {
+            element: card,
+            index: idx,
+            top: rect.top,
+            bottom: rect.bottom,
+            height: rect.height,
+            center: rect.top + rect.height / 2
+        };
+    });
+    
+    if (draggedIndex !== -1 && cachedPositions[draggedIndex]) {
+        initialDraggedCenter = cachedPositions[draggedIndex].center;
+    }
+}
+
 // Funciones para drag and drop con soporte táctil y mouse
 function setupDragAndDrop() {
     const goalCards = document.querySelectorAll('.goal-card');
@@ -1491,6 +1517,9 @@ function startDragWithLongPress(e, card, inputType) {
         initialIndex = currentIndex;
         isDragging = true;
         
+        // Inicializar caché de posiciones al empezar el arrastre
+        cachePositions();
+        
         // Configurar eventos de movimiento según el tipo de input
         if (inputType === 'touch') {
             document.addEventListener('touchmove', handleMove, { passive: false });
@@ -1571,6 +1600,19 @@ function handleMove(e) {
     const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
     currentY = clientY;
     
+    // Usar requestAnimationFrame para evitar lag y sincronizar el dibujado
+    if (!isTicking) {
+        window.requestAnimationFrame(() => {
+            updateDragPosition();
+            isTicking = false;
+        });
+        isTicking = true;
+    }
+}
+
+function updateDragPosition() {
+    if (!isDragging || !draggedElement) return;
+    
     // Calcular desplazamiento 1:1 sin límites arbitrarios
     const deltaY = currentY - startY;
     
@@ -1578,50 +1620,46 @@ function handleMove(e) {
     draggedElement.style.transform = `translateY(${deltaY}px) scale(1.02)`;
     draggedElement.style.zIndex = '1000';
     
-    // Detectar elemento objetivo en base a la posición actual del elemento arrastrado
-    const goalCards = Array.from(document.querySelectorAll('.goal-card'));
-    const draggedIndex = goalCards.indexOf(draggedElement);
+    // Calcular el centro del elemento arrastrado usando la posición matemática acumulada
+    const draggedCenter = initialDraggedCenter + deltaY;
+    
+    // Encontrar índice del elemento arrastrado en cachedPositions
+    const draggedIndex = cachedPositions.findIndex(item => item.element === draggedElement);
+    if (draggedIndex === -1) return;
     
     let targetCard = null;
     let targetIndex = -1;
     
-    // El centro visual del elemento arrastrado en la pantalla
-    const draggedRect = draggedElement.getBoundingClientRect();
-    const draggedCenter = draggedRect.top + draggedRect.height / 2;
-    
-    // Buscar la tarjeta sobre la que estamos
-    for (let i = 0; i < goalCards.length; i++) {
+    // Buscar la tarjeta sobre la que estamos en base al caché
+    for (let i = 0; i < cachedPositions.length; i++) {
         if (i === draggedIndex) continue;
         
-        const card = goalCards[i];
-        const rect = card.getBoundingClientRect();
+        const cardData = cachedPositions[i];
         
         if (draggedIndex < i) {
             // Moviendo hacia abajo
-            if (draggedCenter > rect.top + rect.height / 2) {
-                targetCard = card;
+            if (draggedCenter > cardData.center) {
+                targetCard = cardData.element;
                 targetIndex = i;
             }
         } else {
             // Moviendo hacia arriba
-            if (draggedCenter < rect.top + rect.height / 2) {
-                targetCard = card;
+            if (draggedCenter < cardData.center) {
+                targetCard = cardData.element;
                 targetIndex = i;
                 break;
             }
         }
     }
     
-    // Si no se encontró, buscar por proximidad del cursor
+    // Si no se encontró, buscar por proximidad del cursor usando el caché
     if (!targetCard) {
-        for (let i = 0; i < goalCards.length; i++) {
+        for (let i = 0; i < cachedPositions.length; i++) {
             if (i === draggedIndex) continue;
-            const card = goalCards[i];
-            const rect = card.getBoundingClientRect();
-            const cardCenter = rect.top + rect.height / 2;
+            const cardData = cachedPositions[i];
             
-            if (Math.abs(clientY - cardCenter) < rect.height * 0.4) {
-                targetCard = card;
+            if (Math.abs(currentY - cardData.center) < cardData.height * 0.4) {
+                targetCard = cardData.element;
                 targetIndex = i;
                 break;
             }
@@ -1674,12 +1712,15 @@ function handleMove(e) {
             }
         }, 250);
         
+        // IMPORTANTE: Actualizar el caché de posiciones ya que la estructura en el DOM cambió
+        cachePositions();
+        
         // Actualizar el transform de la arrastrada con el nuevo startY ajustado
-        const newDeltaY = clientY - startY;
+        const newDeltaY = currentY - startY;
         draggedElement.style.transform = `translateY(${newDeltaY}px) scale(1.02)`;
         
         // Vibración de feedback suave
-        if (e.type.includes('touch') && navigator.vibrate) {
+        if (navigator.vibrate) {
             navigator.vibrate(15);
         }
     }
@@ -1732,6 +1773,8 @@ function finalizeDrag(e) {
     startY = 0;
     currentY = 0;
     initialIndex = -1;
+    cachedPositions = [];
+    isTicking = false;
 }
 
 
