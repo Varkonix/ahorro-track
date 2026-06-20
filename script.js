@@ -322,43 +322,59 @@ const currencyInfo = {
     PEN: { name: 'Sol Peruano', flag: '🇵🇪' }
 };
 
+// Símbolos de monedas para formateo global uniforme (separador de miles con punto y decimal con coma)
+const currencySymbols = {
+    USD: '$',
+    EUR: '€',
+    COP: '$',
+    BRL: 'R$',
+    MXN: '$',
+    ARS: '$',
+    CLP: '$',
+    PEN: 'S/'
+};
+
 // ===== FUNCIONES DE FORMATEO DE NÚMEROS =====
 function formatNumberInput(value) {
-    // Si el valor está vacío, retornarlo tal como está
-    if (!value || value === '') return value;
+    if (value === undefined || value === null) return '';
+    let str = value.toString();
+    if (str === '') return '';
     
-    // Remover caracteres no numéricos excepto punto decimal
-    const cleanValue = value.replace(/[^\d.]/g, '');
+    // Verificamos si contiene una coma decimal
+    const hasComma = str.includes(',');
     
-    // Si después de limpiar no hay nada, retornar vacío
-    if (!cleanValue) return '';
+    const parts = str.split(',');
+    let integerPart = parts[0].replace(/\D/g, ''); // Mantener solo dígitos
+    let decimalPart = parts[1] !== undefined ? parts[1].replace(/\D/g, '') : '';
     
-    // Separar parte entera y decimal
-    const parts = cleanValue.split('.');
-    let integerPart = parts[0];
-    const decimalPart = parts[1];
-    
-    // Solo formatear si hay al menos un dígito
-    if (!integerPart) return cleanValue;
-    
-    // Formatear parte entera con separadores de miles
+    // Formatear la parte entera con puntos como separadores de miles
     if (integerPart.length > 3) {
-        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
     
-    // Reconstruir el número
-    let formattedValue = integerPart;
-    if (decimalPart !== undefined) {
-        formattedValue += '.' + decimalPart;
+    // Reconstruir el valor
+    let formatted = integerPart;
+    if (hasComma) {
+        formatted += ',' + decimalPart;
     }
-    
-    return formattedValue;
+    return formatted;
+}
+
+function formatNumberToInputString(num) {
+    if (num === undefined || num === null) return '';
+    // Convertir a string reemplazando punto decimal por coma decimal
+    const str = num.toString().replace('.', ',');
+    return formatNumberInput(str);
 }
 
 function parseFormattedNumber(value) {
-    // Remover separadores de miles y convertir a número
     if (!value || value === '') return 0;
-    return parseFloat(value.replace(/,/g, '')) || 0;
+    let str = value.toString();
+    // Quitar todos los puntos (separadores de miles)
+    str = str.replace(/\./g, '');
+    // Reemplazar la coma decimal por punto decimal
+    str = str.replace(/,/g, '.');
+    return parseFloat(str) || 0;
 }
 
 function setupNumberFormatting(inputId) {
@@ -374,12 +390,12 @@ function setupNumberFormatting(inputId) {
     input.removeEventListener('keydown', input._keydownHandler);
     input.removeEventListener('blur', input._blurHandler);
     
-    // Handler para keydown - permitir solo números, punto decimal y teclas especiales
+    // Handler para keydown - permitir solo números, punto/coma y teclas especiales
     input._keydownHandler = function(e) {
         const allowedKeys = [
             'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
             'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-            'Home', 'End', 'Period'
+            'Home', 'End'
         ];
         
         // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
@@ -397,8 +413,19 @@ function setupNumberFormatting(inputId) {
             return;
         }
         
-        // Permitir punto decimal solo si no hay uno ya
-        if (e.key === '.' && !e.target.value.includes('.')) {
+        // Tratar tanto punto como coma como separador decimal (coma)
+        if (e.key === '.' || e.key === ',') {
+            if (e.target.value.includes(',')) {
+                e.preventDefault();
+                return;
+            }
+            const start = e.target.selectionStart;
+            const end = e.target.selectionEnd;
+            const val = e.target.value;
+            e.target.value = val.slice(0, start) + ',' + val.slice(end);
+            e.target.setSelectionRange(start + 1, start + 1);
+            e.preventDefault();
+            e.target.dispatchEvent(new Event('input'));
             return;
         }
         
@@ -415,17 +442,13 @@ function setupNumberFormatting(inputId) {
         if (newValue !== oldValue) {
             e.target.value = newValue;
             
-            // Calcular nueva posición del cursor
+            // Calcular nueva posición del cursor (contando la diferencia de puntos insertados/removidos)
             let newCursorPosition = cursorPosition;
-            const oldCommas = (oldValue.match(/,/g) || []).length;
-            const newCommas = (newValue.match(/,/g) || []).length;
-            const commasDiff = newCommas - oldCommas;
+            const oldDots = (oldValue.slice(0, cursorPosition).match(/\./g) || []).length;
+            const newDots = (newValue.slice(0, cursorPosition).match(/\./g) || []).length;
+            const dotsDiff = newDots - oldDots;
             
-            if (commasDiff !== 0) {
-                newCursorPosition = cursorPosition + commasDiff;
-            }
-            
-            // Asegurar que el cursor esté en una posición válida
+            newCursorPosition = cursorPosition + dotsDiff;
             newCursorPosition = Math.max(0, Math.min(newCursorPosition, newValue.length));
             
             // Usar setTimeout para asegurar que el cursor se posicione correctamente
@@ -830,12 +853,18 @@ function updateTotals() {
 
 function formatCurrency(amount, currency) {
     try {
-        return new Intl.NumberFormat('es-ES', {
-            style: 'currency',
-            currency: currency,
+        const numberFormatter = new Intl.NumberFormat('es-ES', {
             minimumFractionDigits: 0,
             maximumFractionDigits: 2
-        }).format(amount);
+        });
+        const formattedNumber = numberFormatter.format(amount);
+        const symbol = currencySymbols[currency] || currency;
+        
+        if (currency === 'EUR') {
+            return `${formattedNumber}\u00A0${symbol}`;
+        } else {
+            return `${symbol}\u00A0${formattedNumber}`;
+        }
     } catch (error) {
         return `${amount.toFixed(2)} ${currency}`;
     }
@@ -1014,7 +1043,7 @@ function openEditGoal() {
     const imagePreview = document.getElementById("edit-image-preview");
     
     if (nameInput) nameInput.value = goal.name;
-    if (amountInput) amountInput.value = goal.targetAmount;
+    if (amountInput) amountInput.value = goal.targetAmount > 0 ? formatNumberToInputString(goal.targetAmount) : "";
     
     // Configurar select de monedas
     if (currencySelect) {
@@ -1179,6 +1208,34 @@ function deleteGoal() {
 }
 
 // ===== FUNCIONES AUXILIARES =====
+function formatDateHeader(dateString, locale = 'es') {
+    const d = new Date(dateString);
+    const currentYear = new Date().getFullYear();
+    const txYear = d.getFullYear();
+    
+    // Opciones de formateo
+    const options = { day: 'numeric', month: 'long' };
+    if (txYear !== currentYear) {
+        options.year = 'numeric';
+    }
+    
+    let formatted = '';
+    try {
+        const localeMap = {
+            es: 'es-ES',
+            en: 'en-US',
+            pt: 'pt-BR',
+            que: 'es-PE' // Fallback para Quechua en lo referente a la fecha del sistema local
+        };
+        const lang = localeMap[locale] || 'es-ES';
+        formatted = d.toLocaleDateString(lang, options);
+    } catch (e) {
+        formatted = d.toLocaleDateString('es-ES', options);
+    }
+    
+    return formatted.toUpperCase();
+}
+
 function updateTransactionsList(goal) {
     const container = document.getElementById("transactions-list");
     if (!container) return;
@@ -1189,25 +1246,55 @@ function updateTransactionsList(goal) {
         return;
     }
     
-    container.innerHTML = goal.transactions.map(transaction => {
-        const date = new Date(transaction.date).toLocaleDateString();
-        const time = new Date(transaction.date).toLocaleTimeString();
-        const isPositive = transaction.amount > 0;
+    // Clonar y ordenar transacciones de más reciente a más antigua
+    const sortedTx = [...goal.transactions].sort((a, b) => {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+    
+    // Agrupar por día
+    const groups = [];
+    sortedTx.forEach(tx => {
+        const txDate = new Date(tx.date);
+        const groupKey = `${txDate.getFullYear()}-${txDate.getMonth() + 1}-${txDate.getDate()}`;
         
-        return `
-            <div class="transaction-item ${isPositive ? 'positive' : 'negative'}">
-                <div class="transaction-info">
-                    <span class="transaction-amount">${isPositive ? '+' : ''}${formatCurrency(Math.abs(transaction.amount), goal.currency)}</span>
-                    <span class="transaction-note">${transaction.note}</span>
+        let group = groups.find(g => g.key === groupKey);
+        if (!group) {
+            group = {
+                key: groupKey,
+                date: tx.date,
+                transactions: []
+            };
+            groups.push(group);
+        }
+        group.transactions.push(tx);
+    });
+    
+    // Generar el HTML
+    let html = '';
+    groups.forEach(group => {
+        const headerText = formatDateHeader(group.date, settings.language);
+        html += `<div class="transaction-group-header">${headerText}</div>`;
+        
+        group.transactions.forEach(transaction => {
+            const time = new Date(transaction.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const isPositive = transaction.amount > 0;
+            
+            html += `
+                <div class="transaction-item ${isPositive ? 'positive' : 'negative'}">
+                    <div class="transaction-info">
+                        <span class="transaction-amount">${isPositive ? '+' : ''}${formatCurrency(Math.abs(transaction.amount), goal.currency)}</span>
+                        <span class="transaction-note">${transaction.note || ''}</span>
+                    </div>
+                    <div class="transaction-date">
+                        <span>${time}</span>
+                    </div>
+                    <button class="transaction-edit-btn" onclick="openEditTransactionModal(${goal.id}, ${transaction.id})" title="Editar Movimiento">✏️</button>
                 </div>
-                <div class="transaction-date">
-                    <span>${date}</span>
-                    <span>${time}</span>
-                </div>
-                <button class="transaction-edit-btn" onclick="openEditTransactionModal(${goal.id}, ${transaction.id})" title="Editar Monto">✏️</button>
-            </div>
-        `;
-    }).join('');
+            `;
+        });
+    });
+    
+    container.innerHTML = html;
 }
 
 function handleImageUpload(event) {
@@ -2556,7 +2643,7 @@ function editAutomationRule(id) {
     setupAutomationGoalSelect(rule.goalId);
     setAutomationAction(rule.actionType);
     
-    document.getElementById("automation-amount").value = formatNumberInput(rule.amount.toString());
+    document.getElementById("automation-amount").value = formatNumberToInputString(rule.amount);
     document.getElementById("automation-frequency").value = rule.frequency;
     document.getElementById("automation-note").value = rule.note;
     
@@ -2950,12 +3037,33 @@ function openEditTransactionModal(goalId, transactionId) {
     
     const amountInput = document.getElementById("edit-tx-amount");
     const noteInput = document.getElementById("edit-tx-note");
+    const dateInput = document.getElementById("edit-tx-date");
+    const timeInput = document.getElementById("edit-tx-time");
     
     if (amountInput) {
-        amountInput.value = formatNumberInput(Math.abs(tx.amount).toString());
+        amountInput.value = formatNumberToInputString(Math.abs(tx.amount));
     }
     if (noteInput) {
-        noteInput.value = tx.note;
+        noteInput.value = tx.note || '';
+    }
+    
+    // Precarga de fecha y hora desde el timestamp ISO guardado
+    if (tx.date) {
+        const txDate = new Date(tx.date);
+        // Formato YYYY-MM-DD requerido por input[type=date]
+        const yyyy = txDate.getFullYear();
+        const mm = String(txDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(txDate.getDate()).padStart(2, '0');
+        if (dateInput) dateInput.value = `${yyyy}-${mm}-${dd}`;
+        // Formato HH:MM requerido por input[type=time]
+        const hh = String(txDate.getHours()).padStart(2, '0');
+        const min = String(txDate.getMinutes()).padStart(2, '0');
+        if (timeInput) timeInput.value = `${hh}:${min}`;
+    } else {
+        // Sin fecha guardada: usar la actual como fallback
+        const now = new Date();
+        if (dateInput) dateInput.value = now.toISOString().slice(0, 10);
+        if (timeInput) timeInput.value = now.toTimeString().slice(0, 5);
     }
     
     const modal = document.getElementById("edit-transaction-modal");
@@ -2972,18 +3080,22 @@ function saveEditTransaction() {
     const goalId = Number(document.getElementById("edit-tx-goal-id").value);
     const amountInput = document.getElementById("edit-tx-amount");
     const noteInput = document.getElementById("edit-tx-note");
+    const dateInput = document.getElementById("edit-tx-date");
+    const timeInput = document.getElementById("edit-tx-time");
     
-    if (!amountInput || !noteInput) return;
+    if (!amountInput) return;
     
     const newAmountAbs = parseFormattedNumber(amountInput.value);
-    const newNote = noteInput.value.trim();
+    const newNote = noteInput ? noteInput.value.trim() : '';
+    const newDateStr = dateInput ? dateInput.value : '';
+    const newTimeStr = timeInput ? timeInput.value : '00:00';
     
     if (!newAmountAbs || newAmountAbs <= 0) {
         alert("Por favor, ingresa un monto válido.");
         return;
     }
-    if (!newNote) {
-        alert("Por favor, ingresa una nota/concepto.");
+    if (!newDateStr) {
+        alert("Por favor, selecciona una fecha.");
         return;
     }
     
@@ -2999,8 +3111,14 @@ function saveEditTransaction() {
     const newAmount = isPositive ? newAmountAbs : -newAmountAbs;
     const diff = newAmount - oldAmount;
     
+    // Reconstruir la fecha ISO a partir de fecha + hora seleccionadas por el usuario
+    const [year, month, day] = newDateStr.split('-').map(Number);
+    const [hours, minutes] = newTimeStr.split(':').map(Number);
+    const newDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    
     tx.amount = newAmount;
     tx.note = newNote;
+    tx.date = newDate.toISOString();
     
     goal.currentAmount += diff;
     if (goal.currentAmount < 0) goal.currentAmount = 0;
@@ -3014,7 +3132,7 @@ function saveEditTransaction() {
     }
     
     closeEditTransactionModal();
-    console.log('✅ Transacción editada. Diferencia de saldo aplicada:', diff);
+    console.log('✅ Movimiento editado. Diferencia de saldo aplicada:', diff, '| Nueva fecha:', newDate.toLocaleString());
 }
 
 // ===== FUNCIONES PARA TRANSFERENCIAS ENTRE CUENTAS Y PERFILES =====
@@ -3111,7 +3229,7 @@ function onTransferGoalChange() {
             amountInput.value = formatNumberInput(amountInput.value);
             const srcAmt = parseFormattedNumber(amountInput.value);
             if (srcAmt > 0) {
-                destAmountInput.value = formatNumberInput((srcAmt * rate).toFixed(2));
+                destAmountInput.value = formatNumberToInputString(Math.round(srcAmt * rate * 100) / 100);
             } else {
                 destAmountInput.value = "";
             }

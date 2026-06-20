@@ -1622,3 +1622,86 @@ button:focus-visible, input:focus-visible, select:focus-visible {
     margin-top: 4px;
     vertical-align: middle;
 }
+
+/* ===== EDITAR MOVIMIENTO: Fila Fecha + Hora en paralelo ===== */
+.edit-tx-date-time-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.edit-tx-date-group,
+.edit-tx-time-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.edit-tx-date-group label,
+.edit-tx-time-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.edit-tx-date-group input[type="date"],
+.edit-tx-time-group input[type="time"] {
+    width: 100%;
+    padding: 12px 10px;
+    border: 2px solid var(--primary-color);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    /* Forzar color de texto en Chrome/Safari para dark mode */
+    color-scheme: dark;
+}
+
+.edit-tx-date-group input[type="date"]:focus,
+.edit-tx-time-group input[type="time"]:focus {
+    outline: none;
+    border-color: var(--success-color);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 4px rgba(78, 205, 196, 0.25);
+    transform: scale(1.02);
+}
+
+/* Ícono del datepicker en navegadores WebKit */
+.edit-tx-date-group input[type="date"]::-webkit-calendar-picker-indicator,
+.edit-tx-time-group input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.85);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+}
+
+.edit-tx-date-group input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.edit-tx-time-group input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1) brightness(1.1);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 380px) {
+    .edit-tx-date-time-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+/* Agrupación de transacciones por fecha */
+.transaction-group-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    padding: 14px 4px 6px 4px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
