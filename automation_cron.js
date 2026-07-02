@@ -13,13 +13,80 @@
 
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
 
 const DB_PATH = path.join(__dirname, 'db.json');
 
-// Cargar Base de Datos Local
-function loadDB() {
+// Inicializar cliente de Supabase si existen las credenciales en .env
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+let supabase = null;
+
+if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('⚡ Conectado a Supabase en el cronjob');
+}
+
+// Cargar Base de Datos (Local o Supabase)
+async function loadDB() {
+    if (supabase) {
+        try {
+            console.log('🔄 Cargando base de datos desde Supabase...');
+            const { data: dbProfiles, error: errProf } = await supabase.from('profiles').select('*');
+            if (errProf) throw errProf;
+            
+            const { data: dbGoals, error: errGoals } = await supabase.from('goals').select('*');
+            if (errGoals) throw errGoals;
+            
+            const { data: dbAutomations, error: errAutos } = await supabase.from('automations').select('*');
+            if (errAutos) throw errAutos;
+            
+            return {
+                users: [
+                    {
+                        id: "user_global_1",
+                        email: "user@example.com",
+                        passwordHash: "$2b$12$tQy2zYhK8XvW4rZ0N5uP1eF3k3x9Y7uV6o5i8N4a3d2c1b0"
+                    }
+                ],
+                profiles: dbProfiles.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    emoji: p.emoji || '👤',
+                    color: p.color || '#667eea',
+                    userId: 'user_global_1'
+                })),
+                goals: dbGoals.map(g => ({
+                    id: Number(g.id),
+                    profileId: g.profile_id,
+                    name: g.name,
+                    targetAmount: Number(g.target_amount) || 0,
+                    currentAmount: Number(g.current_amount) || 0,
+                    currency: g.currency,
+                    transactions: g.transactions || [],
+                    createdAt: g.created_at
+                })),
+                automations: dbAutomations.map(a => ({
+                    id: a.id,
+                    goalId: Number(a.goal_id),
+                    profileId: a.profile_id,
+                    actionType: a.action_type,
+                    amount: Number(a.amount) || 0,
+                    frequency: a.frequency,
+                    note: a.note || '',
+                    lastRun: a.last_run,
+                    nextRun: a.next_run,
+                    createdAt: a.created_at
+                }))
+            };
+        } catch (e) {
+            console.error('❌ Error leyendo de Supabase, usando respaldo local:', e);
+        }
+    }
+
+    // Fallback a db.json local
     if (!fs.existsSync(DB_PATH)) {
-        // Inicializar base de datos vacía si no existe
         const initialData = {
             users: [
                 {
@@ -43,7 +110,7 @@ function loadDB() {
                     profileId: "profile_1",
                     name: "Cuenta de Ahorro",
                     targetAmount: 100000,
-                    currentAmount: 100000, // Saldo inicial 100,000 según el ejemplo
+                    currentAmount: 100000,
                     currency: "USD",
                     transactions: [],
                     createdAt: new Date().toISOString()
@@ -54,8 +121,8 @@ function loadDB() {
                     id: "rule_1",
                     goalId: 101,
                     profileId: "profile_1",
-                    actionType: "remove", // Retiro (-)
-                    amount: 28, // Descuento de 28 diario según el ejemplo
+                    actionType: "remove",
+                    amount: 28,
                     frequency: "daily",
                     note: "Agua",
                     lastRun: null,
@@ -71,7 +138,72 @@ function loadDB() {
     return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
 }
 
-function saveDB(data) {
+// Guardar Base de Datos (Local o Supabase)
+async function saveDB(data) {
+    if (supabase) {
+        try {
+            console.log('🔄 Sincronizando cambios hacia Supabase...');
+            
+            // 1. Guardar perfiles
+            if (data.profiles && data.profiles.length > 0) {
+                const upsertProfiles = data.profiles.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    emoji: p.emoji,
+                    color: p.color
+                }));
+                const { error: errP } = await supabase.from('profiles').upsert(upsertProfiles);
+                if (errP) throw errP;
+                
+                const localProfileIds = data.profiles.map(p => p.id);
+                await supabase.from('profiles').delete().not('id', 'in', `(${localProfileIds.map(id => `"${id}"`).join(',')})`);
+            }
+            
+            // 2. Guardar metas
+            if (data.goals && data.goals.length > 0) {
+                const upsertGoals = data.goals.map(g => ({
+                    id: Number(g.id),
+                    profile_id: g.profileId,
+                    name: g.name,
+                    target_amount: g.targetAmount || null,
+                    current_amount: g.currentAmount,
+                    currency: g.currency,
+                    transactions: g.transactions || []
+                }));
+                const { error: errG } = await supabase.from('goals').upsert(upsertGoals);
+                if (errG) throw errG;
+                
+                const localGoalIds = data.goals.map(g => Number(g.id));
+                await supabase.from('goals').delete().not('id', 'in', `(${localGoalIds.join(',')})`);
+            }
+            
+            // 3. Guardar automatizaciones
+            if (data.automations && data.automations.length > 0) {
+                const upsertAutos = data.automations.map(a => ({
+                    id: a.id,
+                    goal_id: Number(a.goalId),
+                    profile_id: a.profileId,
+                    action_type: a.actionType,
+                    amount: a.amount,
+                    frequency: a.frequency,
+                    note: a.note || '',
+                    last_run: a.lastRun || null,
+                    next_run: a.nextRun || null
+                }));
+                const { error: errA } = await supabase.from('automations').upsert(upsertAutos);
+                if (errA) throw errA;
+                
+                const localAutoIds = data.automations.map(a => a.id);
+                await supabase.from('automations').delete().not('id', 'in', `(${localAutoIds.map(id => `"${id}"`).join(',')})`);
+            }
+            
+            console.log('✅ Sincronización hacia Supabase completada con éxito');
+        } catch (e) {
+            console.error('❌ Error escribiendo en Supabase, guardando localmente en db.json:', e);
+        }
+    }
+
+    // Guardar copia local en db.json siempre como respaldo
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
 }
 
@@ -104,26 +236,26 @@ function calculateNextRunDate(fromDate, frequency) {
 }
 
 // 1. Ejecutar Automatizaciones
-function runAutomations() {
-    const db = loadDB();
+async function runAutomations() {
+    const db = await loadDB();
     const now = new Date();
     let updated = false;
 
     console.log(`\n⏰ [${now.toLocaleString()}] Procesando reglas de automatización...`);
 
-    db.automations.forEach(rule => {
+    for (let rule of db.automations) {
         let nextRunDate = new Date(rule.nextRun);
         const goal = db.goals.find(g => g.id === Number(rule.goalId));
 
         if (!goal) {
             console.log(`⚠️ Meta vinculada ${rule.goalId} no encontrada para la regla '${rule.note}'.`);
-            return;
+            continue;
         }
 
         // Validación de seguridad estricta: Aislamiento a nivel de perfil
         if (goal.profileId !== rule.profileId) {
             console.log(`❌ ALERTA DE SEGURIDAD: La regla '${rule.note}' (Perfil: ${rule.profileId}) intentó operar en la cuenta '${goal.name}' (Perfil: ${goal.profileId}). Operación cancelada.`);
-            return;
+            continue;
         }
 
         // Ejecutar ciclos pendientes transcurridos
@@ -160,10 +292,10 @@ function runAutomations() {
             rule.nextRun = nextRunDate.toISOString();
             updated = true;
         }
-    });
+    }
 
     if (updated) {
-        saveDB(db);
+        await saveDB(db);
         console.log(`✅ Base de datos actualizada y guardada correctamente.`);
     } else {
         console.log(`ℹ️ No hay ejecuciones pendientes para procesar.`);
@@ -171,8 +303,8 @@ function runAutomations() {
 }
 
 // 2. Editar Nota de Automatización (Simulación de Opción A/B)
-function editAutomationNote(ruleId, newNote, option) {
-    const db = loadDB();
+async function editAutomationNote(ruleId, newNote, option) {
+    const db = await loadDB();
     const rule = db.automations.find(r => r.id === ruleId);
 
     if (!rule) {
@@ -213,13 +345,13 @@ function editAutomationNote(ruleId, newNote, option) {
         console.log(`ℹ️ Opción A seleccionada: El historial anterior se mantiene intacto. Solo los nuevos movimientos automáticos usarán "${newNote}".`);
     }
 
-    saveDB(db);
+    await saveDB(db);
     console.log(`💾 Base de datos guardada.`);
 }
 
 // 3. Mostrar Estado
-function showStatus() {
-    const db = loadDB();
+async function showStatus() {
+    const db = await loadDB();
     console.log(`\n===== ESTADO DE LA BASE DE DATOS (MULTI-PERFIL) =====`);
     
     console.log(`Usuarios globales: ${db.users ? db.users.length : 0}`);
@@ -259,28 +391,29 @@ function showStatus() {
 const args = process.argv.slice(2);
 const command = args[0];
 
-if (command === '--run') {
-    runAutomations();
-} else if (command === '--edit') {
-    const ruleId = args[1];
-    const newNote = args[2];
-    const option = args[3]; // 'A' o 'B'
+(async () => {
+    if (command === '--run') {
+        await runAutomations();
+    } else if (command === '--edit') {
+        const ruleId = args[1];
+        const newNote = args[2];
+        const option = args[3]; // 'A' o 'B'
 
-    if (!ruleId || !newNote || !option) {
-        console.log("❌ Error: Faltan parámetros para --edit. Uso: node automation_cron.js --edit <id> <nueva_nota> <A|B>");
+        if (!ruleId || !newNote || !option) {
+            console.log("❌ Error: Faltan parámetros para --edit. Uso: node automation_cron.js --edit <id> <nueva_nota> <A|B>");
+        } else {
+            await editAutomationNote(ruleId, newNote, option);
+        }
+    } else if (command === '--status') {
+        await showStatus();
     } else {
-        editAutomationNote(ruleId, newNote, option);
+        console.log(`\n=== MiAhorro Automatizaciones Backend Cronjob ===`);
+        console.log(`Uso:`);
+        console.log(`  node automation_cron.js --run            Procesa automatizaciones pendientes`);
+        console.log(`  node automation_cron.js --status         Muestra el estado actual`);
+        console.log(`  node automation_cron.js --edit <id> <nueva_nota> <A|B>    Edita nota con opción A o B`);
+        console.log(`\nCorriendo por defecto inicialización y ejecución regular...`);
+        await runAutomations();
+        await showStatus();
     }
-} else if (command === '--status') {
-    showStatus();
-} else {
-    // Si se corre sin argumentos, por defecto inicializamos la BD y ejecutamos
-    console.log(`\n=== MiAhorro Automatizaciones Backend Cronjob ===`);
-    console.log(`Uso:`);
-    console.log(`  node automation_cron.js --run            Procesa automatizaciones pendientes`);
-    console.log(`  node automation_cron.js --status         Muestra el estado actual`);
-    console.log(`  node automation_cron.js --edit <id> <nueva_nota> <A|B>    Edita nota con opción A o B`);
-    console.log(`\nCorriendo por defecto inicialización y ejecución regular...`);
-    runAutomations();
-    showStatus();
-}
+})();

@@ -4,8 +4,11 @@ let goals = [];
 let automations = [];
 const settings = {
     language: 'es',
-    currency: 'USD'
+    currency: 'USD',
+    supabaseUrl: '',
+    supabaseKey: ''
 };
+let supabaseClient = null;
 let currentGoalId = null;
 let currentMoneyAction = null;
 
@@ -479,6 +482,256 @@ function mergeCurrentProfileGoals() {
     allGoals = allGoals.concat(goals);
 }
 
+function initSupabase() {
+    if (settings.supabaseUrl && settings.supabaseKey) {
+        try {
+            supabaseClient = supabase.createClient(settings.supabaseUrl, settings.supabaseKey);
+            console.log('⚡ Supabase cliente inicializado con éxito');
+            
+            // Escuchar cambios de estado de autenticación
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                console.log("🔔 Evento de Auth:", event);
+                updateAuthUI(session);
+                if (event === 'SIGNED_IN') {
+                    await syncFromSupabase();
+                }
+            });
+        } catch (e) {
+            console.error('❌ Error al inicializar Supabase:', e);
+            supabaseClient = null;
+        }
+    } else {
+        supabaseClient = null;
+    }
+}
+
+function updateAuthUI(session) {
+    const loginBtn = document.getElementById("login-google-btn");
+    const profileMenu = document.getElementById("user-profile-menu");
+    const avatarImg = document.getElementById("user-avatar");
+    const emailSpan = document.getElementById("user-email");
+    
+    if (session && session.user) {
+        if (loginBtn) loginBtn.style.display = "none";
+        if (profileMenu) profileMenu.style.display = "flex";
+        if (avatarImg) {
+            avatarImg.src = session.user.user_metadata.avatar_url || "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23667eea'/><text x='50' y='65' font-size='40' text-anchor='middle' fill='white'>👤</text></svg>";
+        }
+        if (emailSpan) emailSpan.textContent = session.user.email;
+    } else {
+        if (loginBtn) loginBtn.style.display = "flex";
+        if (profileMenu) profileMenu.style.display = "none";
+    }
+}
+
+async function signInWithGoogle() {
+    if (!supabaseClient) {
+        alert("Por favor, configura las credenciales de Supabase en Ajustes primero.");
+        openSettings();
+        return;
+    }
+    try {
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+        if (error) throw error;
+    } catch (e) {
+        console.error("Error al autenticar con Google:", e.message);
+        alert("Error de autenticación con Google: " + e.message);
+    }
+}
+
+async function signOut(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!supabaseClient) return;
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        updateAuthUI(null);
+        // Limpiar localStorage de metas al desautenticarse para privacidad
+        localStorage.removeItem("miAhorroMetas");
+        localStorage.removeItem("miAhorroProfiles");
+        localStorage.removeItem("miAhorroAutomations");
+        window.location.reload();
+    } catch (e) {
+        console.error("Error al cerrar sesión:", e.message);
+    }
+}
+
+function toggleUserDropdown(event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    const dropdown = document.getElementById("user-dropdown");
+    if (dropdown) {
+        dropdown.classList.toggle("show");
+    }
+}
+
+// Cerrar dropdown si se hace clic fuera
+window.addEventListener("click", () => {
+    const dropdown = document.getElementById("user-dropdown");
+    if (dropdown && dropdown.classList.contains("show")) {
+        dropdown.classList.remove("show");
+    }
+});
+
+async function syncToSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (!user) {
+            console.log('⚠️ Sincronización hacia Supabase omitida: no hay sesión activa.');
+            return;
+        }
+        const activeUserId = user.id;
+        console.log('🔄 Sincronizando datos locales hacia Supabase para el usuario:', activeUserId);
+        
+        // 1. Guardar perfiles
+        if (profiles.length > 0) {
+            const upsertProfiles = profiles.map(p => ({
+                id: p.id,
+                user_id: activeUserId,
+                name: p.name,
+                emoji: p.emoji,
+                color: p.color
+            }));
+            const { error: errP } = await supabaseClient.from('profiles').upsert(upsertProfiles);
+            if (errP) throw errP;
+            
+            // Eliminar perfiles locales que no estén en la lista
+            const localProfileIds = profiles.map(p => p.id);
+            await supabaseClient.from('profiles').delete().eq('user_id', activeUserId).not('id', 'in', `(${localProfileIds.map(id => `"${id}"`).join(',')})`);
+        } else {
+            await supabaseClient.from('profiles').delete().eq('user_id', activeUserId).neq('id', '');
+        }
+        
+        // 2. Guardar metas
+        if (allGoals.length > 0) {
+            const upsertGoals = allGoals.map(g => ({
+                id: Number(g.id),
+                user_id: activeUserId,
+                profile_id: g.profileId,
+                name: g.name,
+                target_amount: g.targetAmount || null,
+                current_amount: g.currentAmount,
+                currency: g.currency,
+                transactions: g.transactions || []
+            }));
+            const { error: errG } = await supabaseClient.from('goals').upsert(upsertGoals);
+            if (errG) throw errG;
+            
+            const localGoalIds = allGoals.map(g => Number(g.id));
+            await supabaseClient.from('goals').delete().eq('user_id', activeUserId).not('id', 'in', `(${localGoalIds.join(',')})`);
+        } else {
+            await supabaseClient.from('goals').delete().eq('user_id', activeUserId).neq('id', 0);
+        }
+        
+        // 3. Guardar automatizaciones
+        if (allAutomations.length > 0) {
+            const upsertAutos = allAutomations.map(a => ({
+                id: a.id,
+                user_id: activeUserId,
+                goal_id: Number(a.goalId),
+                profile_id: a.profileId,
+                action_type: a.actionType,
+                amount: a.amount,
+                frequency: a.frequency,
+                note: a.note || '',
+                last_run: a.lastRun || null,
+                next_run: a.nextRun || null
+            }));
+            const { error: errA } = await supabaseClient.from('automations').upsert(upsertAutos);
+            if (errA) throw errA;
+            
+            const localAutoIds = allAutomations.map(a => a.id);
+            await supabaseClient.from('automations').delete().eq('user_id', activeUserId).not('id', 'in', `(${localAutoIds.map(id => `"${id}"`).join(',')})`);
+        } else {
+            await supabaseClient.from('automations').delete().eq('user_id', activeUserId).neq('id', '');
+        }
+        
+        console.log('✅ Sincronización hacia Supabase completada');
+    } catch (e) {
+        console.error('❌ Error sincronizando hacia Supabase:', e);
+    }
+}
+
+async function syncFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (!user) {
+            console.log('⚠️ Sincronización desde Supabase omitida: no hay sesión activa.');
+            return;
+        }
+        console.log('🔄 Obteniendo datos del usuario autenticado desde Supabase...');
+        
+        const { data: dbProfiles, error: errProf } = await supabaseClient.from('profiles').select('*');
+        if (errProf) throw errProf;
+        
+        const { data: dbGoals, error: errGoals } = await supabaseClient.from('goals').select('*');
+        if (errGoals) throw errGoals;
+        
+        const { data: dbAutomations, error: errAutos } = await supabaseClient.from('automations').select('*');
+        if (errAutos) throw errAutos;
+        
+        if (dbProfiles && dbProfiles.length > 0) {
+            profiles = dbProfiles.map(p => ({
+                id: p.id,
+                name: p.name,
+                emoji: p.emoji || '👤',
+                color: p.color || '#667eea'
+            }));
+        }
+        
+        if (dbGoals) {
+            allGoals = dbGoals.map(g => ({
+                id: Number(g.id),
+                profileId: g.profile_id,
+                name: g.name,
+                targetAmount: Number(g.target_amount) || 0,
+                currentAmount: Number(g.current_amount) || 0,
+                currency: g.currency,
+                transactions: g.transactions || [],
+                createdAt: g.created_at
+            }));
+        }
+        
+        if (dbAutomations) {
+            allAutomations = dbAutomations.map(a => ({
+                id: a.id,
+                goalId: Number(a.goal_id),
+                profileId: a.profile_id,
+                actionType: a.action_type,
+                amount: Number(a.amount) || 0,
+                frequency: a.frequency,
+                note: a.note || '',
+                lastRun: a.last_run,
+                nextRun: a.next_run,
+                createdAt: a.created_at
+            }));
+        }
+        
+        // Guardar copia local de respaldo
+        localStorage.setItem("miAhorroMetas", JSON.stringify(allGoals));
+        localStorage.setItem("miAhorroProfiles", JSON.stringify(profiles));
+        localStorage.setItem("miAhorroAutomations", JSON.stringify(allAutomations));
+        
+        loadActiveProfileData();
+        updateGoalsUI();
+        updateTotals();
+        console.log('✅ Datos sincronizados correctamente desde Supabase');
+    } catch (e) {
+        console.error('❌ Error de sincronización desde Supabase:', e);
+    }
+}
+
 function saveToStorage() {
     try {
         mergeCurrentProfileGoals();
@@ -486,14 +739,26 @@ function saveToStorage() {
         localStorage.setItem("miAhorroSettings", JSON.stringify(settings));
         localStorage.setItem("miAhorroProfiles", JSON.stringify(profiles));
         localStorage.setItem("miAhorroCurrentProfileId", currentProfileId);
-        console.log('✅ Datos guardados correctamente');
+        localStorage.setItem("miAhorroAutomations", JSON.stringify(allAutomations));
+        console.log('✅ Datos guardados localmente');
+        
+        if (supabaseClient) {
+            syncToSupabase();
+        }
     } catch (error) {
-        console.error('❌ Error guardando:', error);
+        console.error('❌ Error guardando localmente:', error);
     }
 }
 
 function loadFromStorage() {
     try {
+        // Cargar primero configuraciones
+        const settingsData = localStorage.getItem("miAhorroSettings");
+        if (settingsData) Object.assign(settings, JSON.parse(settingsData));
+        
+        // Inicializar cliente Supabase si las credenciales existen
+        initSupabase();
+        
         const profilesData = localStorage.getItem("miAhorroProfiles");
         const activeProfileData = localStorage.getItem("miAhorroCurrentProfileId");
         
@@ -551,14 +816,15 @@ function loadFromStorage() {
             }
         }
         
-        const settingsData = localStorage.getItem("miAhorroSettings");
-        if (settingsData) Object.assign(settings, JSON.parse(settingsData));
-        
         loadActiveProfileData();
+        console.log('✅ Datos locales cargados');
         
-        console.log('✅ Datos cargados correctamente');
+        // Si hay conexión de Supabase activa, sincronizar en segundo plano
+        if (supabaseClient) {
+            syncFromSupabase();
+        }
     } catch (error) {
-        console.error('❌ Error cargando:', error);
+        console.error('❌ Error cargando datos locales:', error);
     }
 }
 
@@ -602,9 +868,13 @@ function openSettings() {
         // Cargar valores actuales
         const langSelect = document.getElementById("language-select");
         const currencySelect = document.getElementById("currency-select");
+        const urlInput = document.getElementById("supabase-url");
+        const keyInput = document.getElementById("supabase-key");
         
         if (langSelect) langSelect.value = settings.language;
         if (currencySelect) currencySelect.value = settings.currency;
+        if (urlInput) urlInput.value = settings.supabaseUrl || "";
+        if (keyInput) keyInput.value = settings.supabaseKey || "";
         
         console.log('✅ Modal de configuración abierto');
     }
@@ -623,17 +893,28 @@ function saveSettings() {
     
     const langSelect = document.getElementById("language-select");
     const currencySelect = document.getElementById("currency-select");
+    const urlInput = document.getElementById("supabase-url");
+    const keyInput = document.getElementById("supabase-key");
     
     if (langSelect && currencySelect) {
         settings.language = langSelect.value;
         settings.currency = currencySelect.value;
+        if (urlInput) settings.supabaseUrl = urlInput.value.trim();
+        if (keyInput) settings.supabaseKey = keyInput.value.trim();
+        
+        // Inicializar o re-inicializar cliente Supabase
+        initSupabase();
         
         saveToStorage();
         updateTotals();
         updateGoalsUI(); // Actualizar la interfaz con el nuevo idioma
         updateUILanguage(); // Actualizar todos los textos de la interfaz
         
-        // Mensaje de confirmación removido para evitar notificaciones molestas
+        // Si hay una conexión Supabase nueva, subir los datos locales a Supabase
+        if (supabaseClient) {
+            syncToSupabase();
+        }
+        
         console.log(`✅ Configuración guardada - Idioma: ${settings.language}, Moneda: ${settings.currency}`);
         
         closeSettings();
@@ -725,6 +1006,7 @@ function saveGoal() {
         currency: currency,
         image: null,
         transactions: [],
+        pockets: [],
         createdAt: new Date().toISOString()
     };
     
@@ -795,6 +1077,11 @@ function updateGoalsUI() {
                         <div class="goal-date">
                             Creada: ${new Date(goal.createdAt).toLocaleDateString()}
                         </div>
+                        ${(goal.pockets && goal.pockets.length > 0) ? `
+                            <div class="goal-pockets-badge" onclick="event.stopPropagation(); openGoalDetail(${goal.id})">
+                                👜 ${goal.pockets.length} bolsillo${goal.pockets.length !== 1 ? 's' : ''}
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="drag-handle" onclick="event.stopPropagation()">
@@ -925,6 +1212,9 @@ function openGoalDetail(goalId) {
     
     // Actualizar transacciones
     updateTransactionsList(goal);
+    
+    // Actualizar bolsillos
+    updatePocketsGrid(goal);
     
     modal.style.display = "flex";
     
@@ -1280,7 +1570,7 @@ function updateTransactionsList(goal) {
             const isPositive = transaction.amount > 0;
             
             html += `
-                <div class="transaction-item ${isPositive ? 'positive' : 'negative'}">
+                <div class="transaction-item ${isPositive ? 'positive' : 'negative'}" data-tx-id="${transaction.id}">
                     <div class="transaction-info">
                         <span class="transaction-amount">${isPositive ? '+' : ''}${formatCurrency(Math.abs(transaction.amount), goal.currency)}</span>
                         <span class="transaction-note">${transaction.note || ''}</span>
@@ -1288,7 +1578,10 @@ function updateTransactionsList(goal) {
                     <div class="transaction-date">
                         <span>${time}</span>
                     </div>
-                    <button class="transaction-edit-btn" onclick="openEditTransactionModal(${goal.id}, ${transaction.id})" title="Editar Movimiento">✏️</button>
+                    <div class="transaction-actions">
+                        <button class="transaction-edit-btn" onclick="openEditTransactionModal(${goal.id}, ${transaction.id})" title="Editar">✏️</button>
+                        <button class="transaction-delete-btn" onclick="confirmDeleteTransaction(${goal.id}, ${transaction.id})" title="Eliminar">🗑️</button>
+                    </div>
                 </div>
             `;
         });
@@ -1333,6 +1626,311 @@ window.onclick = function(event) {
         }
     });
 }
+
+// ===== BOLSILLOS (POCKETS) =====
+
+const POCKET_EMOJIS = [
+    '👜','💼','🎒','🛍️','👛','💰','🏦','🏧',
+    '✈️','🏖️','🏠','🚗','📱','👗','👟','💄',
+    '🍔','🎮','🎵','📚','🏋️','🎯','💊','🐶',
+    '🌟','🎁','🎂','🌈','⚡','🔥','💎','🍀',
+    '🏆','🚀','🌙','☀️','💝','🦋','🌺','🎨'
+];
+
+const POCKET_COLORS = [
+    '#667eea','#f6a623','#4ecdc4','#ff6b6b','#a18cd1',
+    '#feca57','#48dbfb','#ff9ff3','#54a0ff','#5f27cd',
+    '#01abc5','#10ac84','#ee5a24','#c8d6e5','#8395a7',
+    '#fd79a8','#e17055','#00b894','#6c5ce7','#fdcb6e'
+];
+
+let currentPocketAction = null; // 'add' | 'remove'
+let currentPocketId = null;
+
+// Render the pockets grid inside goal detail modal
+function updatePocketsGrid(goal) {
+    const grid = document.getElementById('pockets-grid');
+    if (!grid) return;
+    if (!goal.pockets) goal.pockets = [];
+
+    if (goal.pockets.length === 0) {
+        grid.innerHTML = `<div class="pockets-empty">Aún no tienes bolsillos. ¡Crea uno con el botón "Nuevo"!</div>`;
+        return;
+    }
+
+    grid.innerHTML = goal.pockets.map(pocket => {
+        const txCount = (pocket.transactions || []).length;
+        return `
+            <div class="pocket-card" style="--pocket-color: ${pocket.color || '#667eea'};" onclick="openPocketDetail('${pocket.id}')">
+                <span class="pocket-card-emoji">${pocket.emoji || '👜'}</span>
+                <div class="pocket-card-name">${pocket.name}</div>
+                <span class="pocket-card-amount">${formatCurrency(pocket.amount || 0, goal.currency)}</span>
+                <div class="pocket-card-tx-count">${txCount} movimiento${txCount !== 1 ? 's' : ''}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Open modal to create a new pocket
+function openAddPocket() {
+    const modal = document.getElementById('add-pocket-modal');
+    if (!modal) return;
+
+    // Reset form
+    const nameInput = document.getElementById('pocket-name');
+    if (nameInput) nameInput.value = '';
+
+    // Fill emoji selector
+    const emojiSelector = document.getElementById('pocket-emoji-selector');
+    if (emojiSelector) {
+        emojiSelector.innerHTML = POCKET_EMOJIS.map((em, i) => `
+            <div class="pocket-emoji-option ${i === 0 ? 'selected' : ''}" onclick="selectPocketEmoji(this, '${em}')">${em}</div>
+        `).join('');
+        document.getElementById('pocket-emoji-selected').value = POCKET_EMOJIS[0];
+    }
+
+    // Fill color grid
+    const colorGrid = document.getElementById('pocket-color-grid');
+    if (colorGrid) {
+        colorGrid.innerHTML = POCKET_COLORS.map((color, i) => `
+            <div class="pocket-color-option ${i === 0 ? 'selected' : ''}" 
+                 style="background:${color};" 
+                 onclick="selectPocketColor(this, '${color}')"></div>
+        `).join('');
+        document.getElementById('pocket-color-selected').value = POCKET_COLORS[0];
+    }
+
+    modal.style.display = 'flex';
+    setTimeout(() => { if (nameInput) nameInput.focus(); }, 100);
+}
+
+function closeAddPocket() {
+    const modal = document.getElementById('add-pocket-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function selectPocketEmoji(el, emoji) {
+    document.querySelectorAll('#pocket-emoji-selector .pocket-emoji-option').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('pocket-emoji-selected').value = emoji;
+}
+
+function selectPocketColor(el, color) {
+    document.querySelectorAll('#pocket-color-grid .pocket-color-option').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('pocket-color-selected').value = color;
+}
+
+function saveNewPocket() {
+    const nameInput = document.getElementById('pocket-name');
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!name) {
+        nameInput && nameInput.focus();
+        return;
+    }
+
+    const emoji = document.getElementById('pocket-emoji-selected')?.value || '👜';
+    const color = document.getElementById('pocket-color-selected')?.value || '#667eea';
+
+    const goal = goals.find(g => g.id === currentGoalId);
+    if (!goal) return;
+
+    if (!goal.pockets) goal.pockets = [];
+
+    const newPocket = {
+        id: 'pocket_' + Date.now(),
+        name: name,
+        emoji: emoji,
+        color: color,
+        amount: 0,
+        transactions: [],
+        createdAt: new Date().toISOString()
+    };
+
+    goal.pockets.push(newPocket);
+    saveToStorage();
+    updatePocketsGrid(goal);
+    updateGoalsUI();
+    closeAddPocket();
+}
+
+// Open pocket detail modal
+function openPocketDetail(pocketId) {
+    const goal = goals.find(g => g.id === currentGoalId);
+    if (!goal) return;
+    if (!goal.pockets) goal.pockets = [];
+    const pocket = goal.pockets.find(p => p.id === pocketId);
+    if (!pocket) return;
+
+    currentPocketId = pocketId;
+
+    const modal = document.getElementById('pocket-detail-modal');
+    if (!modal) return;
+
+    // Set hero
+    const titleEl = document.getElementById('pocket-detail-title');
+    const emojiEl = document.getElementById('pocket-hero-emoji');
+    const amountEl = document.getElementById('pocket-hero-amount');
+    const heroEl   = document.getElementById('pocket-detail-hero');
+
+    if (titleEl)  titleEl.textContent = pocket.name;
+    if (emojiEl)  emojiEl.textContent = pocket.emoji || '👜';
+    if (amountEl) amountEl.textContent = formatCurrency(pocket.amount || 0, goal.currency);
+    if (heroEl)   heroEl.style.borderTop = `4px solid ${pocket.color || '#667eea'}`;
+
+    // Set transactions
+    updatePocketTransactionsList(pocket, goal.currency);
+
+    modal.style.display = 'flex';
+}
+
+function closePocketDetail() {
+    const modal = document.getElementById('pocket-detail-modal');
+    if (modal) modal.style.display = 'none';
+    currentPocketId = null;
+}
+
+function updatePocketTransactionsList(pocket, currency) {
+    const container = document.getElementById('pocket-transactions-list');
+    if (!container) return;
+    if (!pocket.transactions || pocket.transactions.length === 0) {
+        container.innerHTML = '<p class="no-transactions">No hay movimientos aún</p>';
+        return;
+    }
+
+    const sorted = [...pocket.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    let html = '';
+    sorted.forEach(tx => {
+        const time = new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = new Date(tx.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        const isPositive = tx.amount > 0;
+        html += `
+            <div class="transaction-item ${isPositive ? 'positive' : 'negative'}">
+                <div class="transaction-info">
+                    <span class="transaction-amount">${isPositive ? '+' : ''}${formatCurrency(Math.abs(tx.amount), currency)}</span>
+                    <span class="transaction-note">${tx.note || ''}</span>
+                </div>
+                <div class="transaction-date">
+                    <span>${dateStr} ${time}</span>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+// Add/Remove money to pocket
+function showAddMoneyToPocket() {
+    currentPocketAction = 'add';
+    const titleEl = document.getElementById('pocket-money-modal-title');
+    if (titleEl) titleEl.textContent = 'Agregar al bolsillo';
+    const amountInput = document.getElementById('pocket-money-amount');
+    const noteInput = document.getElementById('pocket-money-note');
+    if (amountInput) amountInput.value = '';
+    if (noteInput) noteInput.value = '';
+    const modal = document.getElementById('pocket-money-modal');
+    if (modal) modal.style.display = 'flex';
+    setupNumberFormatting('pocket-money-amount');
+    setTimeout(() => { if (amountInput) amountInput.focus(); }, 100);
+}
+
+function showRemoveMoneyFromPocket() {
+    currentPocketAction = 'remove';
+    const titleEl = document.getElementById('pocket-money-modal-title');
+    if (titleEl) titleEl.textContent = 'Retirar del bolsillo';
+    const amountInput = document.getElementById('pocket-money-amount');
+    const noteInput = document.getElementById('pocket-money-note');
+    if (amountInput) amountInput.value = '';
+    if (noteInput) noteInput.value = '';
+    const modal = document.getElementById('pocket-money-modal');
+    if (modal) modal.style.display = 'flex';
+    setupNumberFormatting('pocket-money-amount');
+    setTimeout(() => { if (amountInput) amountInput.focus(); }, 100);
+}
+
+function closePocketMoneyModal() {
+    const modal = document.getElementById('pocket-money-modal');
+    if (modal) modal.style.display = 'none';
+    currentPocketAction = null;
+}
+
+function savePocketMoneyTransaction() {
+    const amountInput = document.getElementById('pocket-money-amount');
+    const noteInput = document.getElementById('pocket-money-note');
+    if (!amountInput) return;
+
+    const amount = parseFormattedNumber(amountInput.value);
+    if (!amount || amount <= 0) return;
+
+    const note = noteInput ? noteInput.value.trim() : '';
+    const goal = goals.find(g => g.id === currentGoalId);
+    if (!goal || !goal.pockets) return;
+    const pocket = goal.pockets.find(p => p.id === currentPocketId);
+    if (!pocket) return;
+
+    const tx = {
+        id: Date.now(),
+        amount: currentPocketAction === 'add' ? amount : -amount,
+        note: note || (currentPocketAction === 'add' ? 'Agregado' : 'Retirado'),
+        date: new Date().toISOString(),
+        type: currentPocketAction
+    };
+
+    if (!pocket.transactions) pocket.transactions = [];
+    pocket.transactions.unshift(tx);
+
+    if (currentPocketAction === 'add') {
+        pocket.amount = (pocket.amount || 0) + amount;
+    } else {
+        pocket.amount = Math.max(0, (pocket.amount || 0) - amount);
+    }
+
+    saveToStorage();
+    closePocketMoneyModal();
+
+    // Refresh pocket detail modal
+    const heroAmount = document.getElementById('pocket-hero-amount');
+    if (heroAmount) heroAmount.textContent = formatCurrency(pocket.amount, goal.currency);
+    updatePocketTransactionsList(pocket, goal.currency);
+
+    // Also update the pockets grid in goal detail
+    updatePocketsGrid(goal);
+    // And refresh goal card badges
+    updateGoalsUI();
+}
+
+// Delete pocket
+function confirmDeletePocket() {
+    const goal = goals.find(g => g.id === currentGoalId);
+    if (!goal || !goal.pockets) return;
+    const pocket = goal.pockets.find(p => p.id === currentPocketId);
+    if (!pocket) return;
+
+    const label = document.getElementById('delete-pocket-name-label');
+    if (label) label.textContent = `"${pocket.name}"`;
+
+    const modal = document.getElementById('confirm-delete-pocket-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeConfirmDeletePocket() {
+    const modal = document.getElementById('confirm-delete-pocket-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function executeDeletePocket() {
+    const goal = goals.find(g => g.id === currentGoalId);
+    if (!goal || !goal.pockets) return;
+    goal.pockets = goal.pockets.filter(p => p.id !== currentPocketId);
+
+    saveToStorage();
+    updatePocketsGrid(goal);
+    updateGoalsUI();
+    closeConfirmDeletePocket();
+    closePocketDetail();
+}
+
+
 
 
 
@@ -3134,6 +3732,84 @@ function saveEditTransaction() {
     closeEditTransactionModal();
     console.log('✅ Movimiento editado. Diferencia de saldo aplicada:', diff, '| Nueva fecha:', newDate.toLocaleString());
 }
+
+// ===== ELIMINAR MOVIMIENTO =====
+let _deleteTxGoalId = null;
+let _deleteTxId = null;
+
+function confirmDeleteTransaction(goalId, transactionId) {
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+    const tx = goal.transactions.find(t => t.id === transactionId);
+    if (!tx) return;
+
+    _deleteTxGoalId = goalId;
+    _deleteTxId = transactionId;
+
+    // Rellenar el modal con info del movimiento
+    const isPositive = tx.amount > 0;
+    const amountStr = (isPositive ? '+' : '') + formatCurrency(Math.abs(tx.amount), goal.currency);
+    const dateStr = new Date(tx.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const amountEl  = document.getElementById('del-tx-amount');
+    const noteEl    = document.getElementById('del-tx-note');
+    const dateEl    = document.getElementById('del-tx-date');
+    const goalEl    = document.getElementById('del-tx-goal');
+    const effectEl  = document.getElementById('del-tx-effect');
+
+    if (amountEl)  amountEl.textContent  = amountStr;
+    if (amountEl)  amountEl.className    = isPositive ? 'del-tx-positive' : 'del-tx-negative';
+    if (noteEl)    noteEl.textContent    = tx.note || '(sin nota)';
+    if (dateEl)    dateEl.textContent    = `${dateStr} a las ${timeStr}`;
+    if (goalEl)    goalEl.textContent    = goal.name;
+    if (effectEl)  effectEl.textContent  = isPositive
+        ? `⚠️ Se descontarán ${formatCurrency(Math.abs(tx.amount), goal.currency)} del saldo de la meta.`
+        : `⚠️ Se agregarán ${formatCurrency(Math.abs(tx.amount), goal.currency)} al saldo de la meta.`;
+
+    const modal = document.getElementById('confirm-delete-tx-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeConfirmDeleteTx() {
+    const modal = document.getElementById('confirm-delete-tx-modal');
+    if (modal) modal.style.display = 'none';
+    _deleteTxGoalId = null;
+    _deleteTxId = null;
+}
+
+function executeDeleteTransaction() {
+    if (_deleteTxGoalId === null || _deleteTxId === null) return;
+
+    const goal = goals.find(g => g.id === _deleteTxGoalId);
+    if (!goal) return;
+
+    const txIndex = goal.transactions.findIndex(t => t.id === _deleteTxId);
+    if (txIndex === -1) return;
+
+    const tx = goal.transactions[txIndex];
+
+    // Revertir el efecto del movimiento en el saldo
+    goal.currentAmount -= tx.amount;
+    if (goal.currentAmount < 0) goal.currentAmount = 0;
+
+    // Eliminar la transacción
+    goal.transactions.splice(txIndex, 1);
+
+    saveToStorage();
+    updateGoalsUI();
+    updateTotals();
+
+    // Refrescar modal de detalle si está abierto
+    if (currentGoalId === _deleteTxGoalId) {
+        openGoalDetail(_deleteTxGoalId);
+    }
+
+    closeConfirmDeleteTx();
+    console.log('🗑️ Movimiento eliminado. Saldo actualizado.');
+}
+
+
 
 // ===== FUNCIONES PARA TRANSFERENCIAS ENTRE CUENTAS Y PERFILES =====
 

@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 
 # Configurar encoding UTF-8 en consola para evitar UnicodeEncodeError en Windows
 if sys.platform.startswith('win'):
@@ -10,11 +11,90 @@ if sys.platform.startswith('win'):
     except Exception:
         pass
 
+load_dotenv()
+
+# Inicializar cliente de Supabase
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_KEY")
+supabase = None
+
+if supabase_url and supabase_key:
+    try:
+        from supabase import create_client
+        supabase = create_client(supabase_url, supabase_key)
+        print("⚡ Conectado a Supabase en el cronjob de Python")
+    except ImportError:
+        print("⚠️ Advertencia: Instala 'supabase' y 'python-dotenv' para conectar con Supabase.")
+    except Exception as e:
+        print(f"❌ Error al inicializar cliente de Supabase: {e}")
+
 DB_PATH = os.path.join(os.path.dirname(__file__), 'db.json')
 
 def load_db():
+    if supabase:
+        try:
+            print("🔄 Cargando base de datos desde Supabase...")
+            # Leer perfiles
+            prof_res = supabase.table('profiles').select('*').execute()
+            db_profiles = prof_res.data
+            
+            # Leer metas
+            goals_res = supabase.table('goals').select('*').execute()
+            db_goals = goals_res.data
+            
+            # Leer automatizaciones
+            autos_res = supabase.table('automations').select('*').execute()
+            db_automations = autos_res.data
+            
+            return {
+                "users": [
+                    {
+                        "id": "user_global_1",
+                        "email": "user@example.com",
+                        "passwordHash": "$2b$12$tQy2zYhK8XvW4rZ0N5uP1eF3k3x9Y7uV6o5i8N4a3d2c1b0"
+                    }
+                ],
+                "profiles": [
+                    {
+                        "id": p["id"],
+                        "name": p["name"],
+                        "emoji": p.get("emoji", "👤"),
+                        "color": p.get("color", "#667eea"),
+                        "userId": "user_global_1"
+                    } for p in db_profiles
+                ],
+                "goals": [
+                    {
+                        "id": int(g["id"]),
+                        "profileId": g["profile_id"],
+                        "name": g["name"],
+                        "targetAmount": float(g["target_amount"]) if g.get("target_amount") is not None else 0.0,
+                        "currentAmount": float(g["current_amount"]) if g.get("current_amount") is not None else 0.0,
+                        "currency": g["currency"],
+                        "transactions": g.get("transactions") or [],
+                        "createdAt": g.get("created_at")
+                    } for g in db_goals
+                ],
+                "automations": [
+                    {
+                        "id": a["id"],
+                        "goalId": int(a["goal_id"]),
+                        "profileId": a["profile_id"],
+                        "actionType": a["action_type"],
+                        "amount": float(a["amount"]) if a.get("amount") is not None else 0.0,
+                        "frequency": a["frequency"],
+                        "note": a.get("note", ""),
+                        "lastRun": a.get("last_run"),
+                        "nextRun": a.get("next_run"),
+                        "createdAt": a.get("created_at")
+                    } for a in db_automations
+                ]
+            }
+        except Exception as e:
+            print(f"❌ Error leyendo de Supabase, usando respaldo local: {e}")
+
+    # Fallback local
     if not os.path.exists(DB_PATH):
-        # Initial database state
         initial_data = {
             "users": [
                 {
@@ -38,7 +118,7 @@ def load_db():
                     "profileId": "profile_1",
                     "name": "Cuenta de Ahorro",
                     "targetAmount": 100000.0,
-                    "currentAmount": 100000.0,  # Initial balance 100,000 according to requirement
+                    "currentAmount": 100000.0,
                     "currency": "USD",
                     "transactions": [],
                     "createdAt": datetime.now().isoformat()
@@ -49,8 +129,8 @@ def load_db():
                     "id": "rule_1",
                     "goalId": 101,
                     "profileId": "profile_1",
-                    "actionType": "remove",  # Retiro (-)
-                    "amount": 28.0,  # Discount of 28 daily
+                    "actionType": "remove",
+                    "amount": 28.0,
                     "frequency": "daily",
                     "note": "Agua",
                     "lastRun": None,
@@ -67,12 +147,76 @@ def load_db():
         return json.load(f)
 
 def save_db(data):
+    if supabase:
+        try:
+            print("🔄 Sincronizando cambios hacia Supabase...")
+            
+            # 1. Guardar perfiles
+            if data.get("profiles"):
+                upsert_profiles = [
+                    {
+                        "id": p["id"],
+                        "name": p["name"],
+                        "emoji": p.get("emoji"),
+                        "color": p.get("color")
+                    } for p in data["profiles"]
+                ]
+                supabase.table('profiles').upsert(upsert_profiles).execute()
+                
+                # Eliminar perfiles que ya no existen
+                local_profile_ids = [p["id"] for p in data["profiles"]]
+                supabase.table('profiles').delete().not_in('id', local_profile_ids).execute()
+            
+            # 2. Guardar metas
+            if data.get("goals"):
+                upsert_goals = [
+                    {
+                        "id": g["id"],
+                        "profile_id": g["profileId"],
+                        "name": g["name"],
+                        "target_amount": g["targetAmount"] if g.get("targetAmount") else None,
+                        "current_amount": g["currentAmount"],
+                        "currency": g["currency"],
+                        "transactions": g.get("transactions") or []
+                    } for g in data["goals"]
+                ]
+                supabase.table('goals').upsert(upsert_goals).execute()
+                
+                # Eliminar metas que ya no existen
+                local_goal_ids = [g["id"] for g in data["goals"]]
+                supabase.table('goals').delete().not_in('id', local_goal_ids).execute()
+                
+            # 3. Guardar automatizaciones
+            if data.get("automations"):
+                upsert_autos = [
+                    {
+                        "id": a["id"],
+                        "goal_id": a["goalId"],
+                        "profile_id": a["profileId"],
+                        "action_type": a["actionType"],
+                        "amount": a["amount"],
+                        "frequency": a["frequency"],
+                        "note": a.get("note", ""),
+                        "last_run": a.get("lastRun"),
+                        "next_run": a.get("nextRun")
+                    } for a in data["automations"]
+                ]
+                supabase.table('automations').upsert(upsert_autos).execute()
+                
+                # Eliminar automatizaciones que ya no existen
+                local_auto_ids = [a["id"] for a in data["automations"]]
+                supabase.table('automations').delete().not_in('id', local_auto_ids).execute()
+                
+            print("✅ Sincronización hacia Supabase completada con éxito")
+        except Exception as e:
+            print(f"❌ Error escribiendo en Supabase, guardando localmente en db.json: {e}")
+
+    # Escribir localmente como respaldo
     with open(DB_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def calculate_next_run_date(from_date_str, frequency):
     from_date = datetime.fromisoformat(from_date_str)
-    # Ensure it's 1:00:05 AM
     from_date = from_date.replace(hour=1, minute=0, second=5, microsecond=0)
     
     if frequency == 'daily':
@@ -80,13 +224,11 @@ def calculate_next_run_date(from_date_str, frequency):
     elif frequency == 'weekly':
         next_date = from_date + timedelta(weeks=1)
     elif frequency == 'monthly':
-        # Simple month increment
         month = from_date.month + 1
         year = from_date.year
         if month > 12:
             month = 1
             year += 1
-        # Handle end-of-month days safely
         day = min(from_date.day, 28)
         next_date = from_date.replace(year=year, month=month, day=day)
     elif frequency == 'yearly':
